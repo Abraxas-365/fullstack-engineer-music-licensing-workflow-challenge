@@ -1,0 +1,13 @@
+pub mod adapters;
+mod error;
+mod model;
+mod port;
+mod service;
+
+pub use error::LicenseError;
+pub use model::{
+    CreateLicenseRequest, LicenseOffer, LicenseOfferResponse, LicenseRequest,
+    LicenseRequestResponse, LicenseStatus, NegotiationSide, OfferTerms,
+};
+pub use port::LicenseRepository;
+pub use service::LicenseService;
