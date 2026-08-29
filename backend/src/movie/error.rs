@@ -14,4 +14,20 @@ impl MovieError {
             ErrorType::Conflict,
         )
     }
+
+    pub fn member_already_added() -> AppError {
+        AppError::new(
+            "movie.member_already_added",
+            "User is already a member of this movie",
+            ErrorType::Conflict,
+        )
+    }
+
+    pub fn member_not_found() -> AppError {
+        AppError::new(
+            "movie.member_not_found",
+            "User is not a member of this movie",
+            ErrorType::NotFound,
+        )
+    }
 }

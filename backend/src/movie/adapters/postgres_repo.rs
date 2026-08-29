@@ -3,7 +3,7 @@ use sqlx::PgPool;
 use crate::error::AppError;
 use crate::kernel::{MovieId, Paginated, PaginationOptions, UserId};
 
-use super::super::model::{Movie, MovieFilter};
+use super::super::model::{Movie, MovieFilter, MovieMember, MovieRole};
 use super::super::port::MovieRepository;
 
 const MOVIE_COLUMNS: &str =
@@ -156,4 +156,95 @@ impl MovieRepository for PostgresMovieRepository {
 
         rows.iter().map(movie_from_row).collect()
     }
+
+    // Membership
+
+    async fn add_member(&self, member: &MovieMember) -> Result<(), AppError> {
+        sqlx::query(
+            "INSERT INTO movie_members (movie_id, user_id, role, joined_at) VALUES ($1, $2, $3, $4)",
+        )
+        .bind(member.movie_id.as_str())
+        .bind(member.user_id.as_str())
+        .bind(member.role.as_str())
+        .bind(member.joined_at)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
+        Ok(())
+    }
+
+    async fn remove_member(&self, movie_id: &MovieId, user_id: &UserId) -> Result<(), AppError> {
+        sqlx::query("DELETE FROM movie_members WHERE movie_id = $1 AND user_id = $2")
+            .bind(movie_id.as_str())
+            .bind(user_id.as_str())
+            .execute(&self.pool)
+            .await
+            .map_err(|e| AppError::internal(e.to_string()))?;
+        Ok(())
+    }
+
+    async fn get_member(
+        &self,
+        movie_id: &MovieId,
+        user_id: &UserId,
+    ) -> Result<Option<MovieMember>, AppError> {
+        let row = sqlx::query(
+            "SELECT movie_id, user_id, role, joined_at FROM movie_members WHERE movie_id = $1 AND user_id = $2",
+        )
+        .bind(movie_id.as_str())
+        .bind(user_id.as_str())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
+
+        row.as_ref().map(member_from_row).transpose()
+    }
+
+    async fn list_members(&self, movie_id: &MovieId) -> Result<Vec<MovieMember>, AppError> {
+        let rows = sqlx::query(
+            "SELECT movie_id, user_id, role, joined_at FROM movie_members WHERE movie_id = $1 ORDER BY joined_at ASC",
+        )
+        .bind(movie_id.as_str())
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
+
+        rows.iter().map(member_from_row).collect()
+    }
+
+    async fn get_user_movies(&self, user_id: &UserId) -> Result<Vec<Movie>, AppError> {
+        let rows = sqlx::query(&format!(
+            "SELECT {MOVIE_COLUMNS} FROM movies
+             INNER JOIN movie_members ON movies.id = movie_members.movie_id
+             WHERE movie_members.user_id = $1
+             ORDER BY movies.created_at DESC"
+        ))
+        .bind(user_id.as_str())
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
+
+        rows.iter().map(movie_from_row).collect()
+    }
+}
+
+fn member_from_row(row: &sqlx::postgres::PgRow) -> Result<MovieMember, AppError> {
+    use sqlx::Row;
+    let role_str: String = row
+        .try_get("role")
+        .map_err(|e| AppError::internal(e.to_string()))?;
+    Ok(MovieMember {
+        movie_id: MovieId::from_string(
+            row.try_get("movie_id")
+                .map_err(|e| AppError::internal(e.to_string()))?,
+        ),
+        user_id: UserId::from_string(
+            row.try_get("user_id")
+                .map_err(|e| AppError::internal(e.to_string()))?,
+        ),
+        role: MovieRole::try_from(role_str.as_str())?,
+        joined_at: row
+            .try_get("joined_at")
+            .map_err(|e| AppError::internal(e.to_string()))?,
+    })
 }

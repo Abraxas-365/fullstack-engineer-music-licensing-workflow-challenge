@@ -7,7 +7,8 @@ use backend::iam::user::{PasswordService, User, UserRepository};
 use backend::kernel::{MovieId, UserId};
 use backend::movie::adapters::PostgresMovieRepository;
 use backend::movie::{
-    CreateMovieRequest, MovieFilter, MovieRepository, MovieService, UpdateMovieRequest,
+    AddMovieMemberRequest, CreateMovieRequest, MovieFilter, MovieRepository, MovieRole,
+    MovieService, UpdateMovieRequest,
 };
 
 use common::TestDb;
@@ -500,5 +501,206 @@ async fn test_delete_user_cascades_movies() {
     ctx.user_repo.delete(&user.id).await.unwrap();
 
     let movies = ctx.movie_repo.list_by_user(&user.id).await.unwrap();
+    assert_eq!(movies.len(), 0);
+}
+
+// ============================================================================
+// Service: Membership
+// ============================================================================
+
+#[tokio::test]
+async fn test_service_create_movie_auto_adds_owner() {
+    let ctx = TestContext::new().await;
+    let user = ctx.create_user("user@example.com").await;
+    let movie = ctx
+        .movie_svc
+        .create_movie(ctx.create_req("Movie"), user.id.clone())
+        .await
+        .unwrap();
+    let members = ctx.movie_svc.list_members(&movie.id).await.unwrap();
+    assert_eq!(members.len(), 1);
+    assert_eq!(members[0].user_id.as_str(), user.id.as_str());
+    assert_eq!(members[0].role, MovieRole::Owner);
+}
+
+#[tokio::test]
+async fn test_service_add_member() {
+    let ctx = TestContext::new().await;
+    let owner = ctx.create_user("owner@example.com").await;
+    let other = ctx.create_user("other@example.com").await;
+
+    let movie = ctx
+        .movie_svc
+        .create_movie(ctx.create_req("Movie"), owner.id.clone())
+        .await
+        .unwrap();
+
+    let member = ctx
+        .movie_svc
+        .add_member(
+            &movie.id,
+            AddMovieMemberRequest {
+                user_id: other.id.clone(),
+                role: Some("SUPERVISOR".into()),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(member.role, MovieRole::Supervisor);
+
+    let members = ctx.movie_svc.list_members(&movie.id).await.unwrap();
+    assert_eq!(members.len(), 2);
+}
+
+#[tokio::test]
+async fn test_service_add_member_default_role() {
+    let ctx = TestContext::new().await;
+    let owner = ctx.create_user("owner@example.com").await;
+    let other = ctx.create_user("other@example.com").await;
+
+    let movie = ctx
+        .movie_svc
+        .create_movie(ctx.create_req("Movie"), owner.id.clone())
+        .await
+        .unwrap();
+
+    let member = ctx
+        .movie_svc
+        .add_member(
+            &movie.id,
+            AddMovieMemberRequest {
+                user_id: other.id.clone(),
+                role: None,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(member.role, MovieRole::Viewer);
+}
+
+#[tokio::test]
+async fn test_service_add_member_duplicate() {
+    let ctx = TestContext::new().await;
+    let owner = ctx.create_user("owner@example.com").await;
+
+    let movie = ctx
+        .movie_svc
+        .create_movie(ctx.create_req("Movie"), owner.id.clone())
+        .await
+        .unwrap();
+
+    let err = ctx
+        .movie_svc
+        .add_member(
+            &movie.id,
+            AddMovieMemberRequest {
+                user_id: owner.id.clone(),
+                role: None,
+            },
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, "movie.member_already_added");
+}
+
+#[tokio::test]
+async fn test_service_remove_member() {
+    let ctx = TestContext::new().await;
+    let owner = ctx.create_user("owner@example.com").await;
+    let other = ctx.create_user("other@example.com").await;
+
+    let movie = ctx
+        .movie_svc
+        .create_movie(ctx.create_req("Movie"), owner.id.clone())
+        .await
+        .unwrap();
+
+    ctx.movie_svc
+        .add_member(
+            &movie.id,
+            AddMovieMemberRequest {
+                user_id: other.id.clone(),
+                role: None,
+            },
+        )
+        .await
+        .unwrap();
+
+    ctx.movie_svc
+        .remove_member(&movie.id, &other.id)
+        .await
+        .unwrap();
+
+    let members = ctx.movie_svc.list_members(&movie.id).await.unwrap();
+    assert_eq!(members.len(), 1); // Only owner remains
+}
+
+#[tokio::test]
+async fn test_service_get_user_movies() {
+    let ctx = TestContext::new().await;
+    let owner = ctx.create_user("owner@example.com").await;
+    let collaborator = ctx.create_user("collab@example.com").await;
+
+    let m1 = ctx
+        .movie_svc
+        .create_movie(ctx.create_req("M1"), owner.id.clone())
+        .await
+        .unwrap();
+    ctx.movie_svc
+        .create_movie(ctx.create_req("M2"), owner.id.clone())
+        .await
+        .unwrap();
+
+    // Add collaborator to M1 only
+    ctx.movie_svc
+        .add_member(
+            &m1.id,
+            AddMovieMemberRequest {
+                user_id: collaborator.id.clone(),
+                role: Some("EDITOR".into()),
+            },
+        )
+        .await
+        .unwrap();
+
+    let owner_movies = ctx.movie_svc.get_user_movies(&owner.id).await.unwrap();
+    assert_eq!(owner_movies.len(), 2);
+
+    let collab_movies = ctx
+        .movie_svc
+        .get_user_movies(&collaborator.id)
+        .await
+        .unwrap();
+    assert_eq!(collab_movies.len(), 1);
+    assert_eq!(collab_movies[0].title, "M1");
+}
+
+#[tokio::test]
+async fn test_delete_movie_cascades_members() {
+    let ctx = TestContext::new().await;
+    let owner = ctx.create_user("owner@example.com").await;
+    let other = ctx.create_user("other@example.com").await;
+
+    let movie = ctx
+        .movie_svc
+        .create_movie(ctx.create_req("Movie"), owner.id.clone())
+        .await
+        .unwrap();
+
+    ctx.movie_svc
+        .add_member(
+            &movie.id,
+            AddMovieMemberRequest {
+                user_id: other.id.clone(),
+                role: None,
+            },
+        )
+        .await
+        .unwrap();
+
+    ctx.movie_repo.delete(&movie.id).await.unwrap();
+
+    // Collaborator should see no movies
+    let movies = ctx.movie_svc.get_user_movies(&other.id).await.unwrap();
     assert_eq!(movies.len(), 0);
 }

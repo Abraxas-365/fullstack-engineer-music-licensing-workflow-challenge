@@ -104,7 +104,7 @@ impl SceneService {
 mod tests {
     use super::*;
     use crate::kernel::{MovieId, Paginated, PaginationOptions, UserId};
-    use crate::movie::{Movie, MovieRepository};
+    use crate::movie::{Movie, MovieMember, MovieRepository};
     use tokio::sync::Mutex;
 
     // ========================================================================
@@ -197,6 +197,25 @@ mod tests {
             Ok(())
         }
         async fn list_by_user(&self, _: &UserId) -> Result<Vec<Movie>, AppError> {
+            Ok(vec![])
+        }
+        async fn add_member(&self, _: &MovieMember) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn remove_member(&self, _: &MovieId, _: &UserId) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn get_member(
+            &self,
+            _: &MovieId,
+            _: &UserId,
+        ) -> Result<Option<MovieMember>, AppError> {
+            Ok(None)
+        }
+        async fn list_members(&self, _: &MovieId) -> Result<Vec<MovieMember>, AppError> {
+            Ok(vec![])
+        }
+        async fn get_user_movies(&self, _: &UserId) -> Result<Vec<Movie>, AppError> {
             Ok(vec![])
         }
     }

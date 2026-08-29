@@ -5,6 +5,9 @@ mod port;
 mod service;
 
 pub use error::MovieError;
-pub use model::{CreateMovieRequest, Movie, MovieFilter, MovieResponse, UpdateMovieRequest};
+pub use model::{
+    AddMovieMemberRequest, CreateMovieRequest, Movie, MovieFilter, MovieMember,
+    MovieMemberResponse, MovieResponse, MovieRole, UpdateMovieRequest,
+};
 pub use port::MovieRepository;
 pub use service::MovieService;

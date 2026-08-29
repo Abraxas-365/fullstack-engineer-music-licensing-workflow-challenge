@@ -37,6 +37,51 @@ impl Movie {
 }
 
 // ============================================================================
+// Movie Membership
+// ============================================================================
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MovieRole {
+    Owner,
+    Supervisor,
+    Editor,
+    Viewer,
+}
+
+impl MovieRole {
+    pub fn as_str(&self) -> &str {
+        match self {
+            MovieRole::Owner => "OWNER",
+            MovieRole::Supervisor => "SUPERVISOR",
+            MovieRole::Editor => "EDITOR",
+            MovieRole::Viewer => "VIEWER",
+        }
+    }
+}
+
+impl TryFrom<&str> for MovieRole {
+    type Error = AppError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "OWNER" => Ok(MovieRole::Owner),
+            "SUPERVISOR" => Ok(MovieRole::Supervisor),
+            "EDITOR" => Ok(MovieRole::Editor),
+            "VIEWER" => Ok(MovieRole::Viewer),
+            _ => Err(AppError::validation(format!("Invalid movie role: {value}"))),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MovieMember {
+    pub movie_id: MovieId,
+    pub user_id: UserId,
+    pub role: MovieRole,
+    pub joined_at: DateTime<Utc>,
+}
+
+// ============================================================================
 // DTOs
 // ============================================================================
 
@@ -125,4 +170,27 @@ impl From<Movie> for MovieResponse {
 pub struct MovieFilter {
     pub search: Option<String>,
     pub created_by: Option<UserId>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MovieMemberResponse {
+    pub user_id: UserId,
+    pub role: String,
+    pub joined_at: DateTime<Utc>,
+}
+
+impl From<&MovieMember> for MovieMemberResponse {
+    fn from(m: &MovieMember) -> Self {
+        Self {
+            user_id: m.user_id.clone(),
+            role: m.role.as_str().to_string(),
+            joined_at: m.joined_at,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AddMovieMemberRequest {
+    pub user_id: UserId,
+    pub role: Option<String>,
 }

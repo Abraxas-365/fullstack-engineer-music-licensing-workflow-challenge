@@ -232,6 +232,24 @@ CREATE TRIGGER update_movies_updated_at BEFORE UPDATE ON movies
 COMMENT ON TABLE movies IS 'Movies that require music licensing for their scenes';
 
 -- ============================================================================
+-- MOVIE MEMBERS
+-- ============================================================================
+
+CREATE TABLE movie_members (
+    movie_id    VARCHAR(255) NOT NULL REFERENCES movies(id) ON DELETE CASCADE,
+    user_id     VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role        VARCHAR(50) NOT NULL DEFAULT 'VIEWER',
+    joined_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    PRIMARY KEY (movie_id, user_id),
+    CONSTRAINT chk_movie_member_role CHECK (role IN ('OWNER', 'SUPERVISOR', 'EDITOR', 'VIEWER'))
+);
+
+CREATE INDEX idx_movie_members_user_id ON movie_members(user_id);
+
+COMMENT ON TABLE movie_members IS 'Users who collaborate on a movie project';
+
+-- ============================================================================
 -- SCENES
 -- ============================================================================
 

@@ -1,4 +1,5 @@
 DROP TABLE IF EXISTS scenes;
+DROP TABLE IF EXISTS movie_members;
 DROP TABLE IF EXISTS movies;
 DROP TABLE IF EXISTS songs;
 DROP TABLE IF EXISTS label_members;
