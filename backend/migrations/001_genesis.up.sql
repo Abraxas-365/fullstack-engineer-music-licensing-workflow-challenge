@@ -205,3 +205,28 @@ CREATE TRIGGER update_songs_updated_at BEFORE UPDATE ON songs
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 COMMENT ON TABLE songs IS 'Musical works available for licensing';
+
+-- ============================================================================
+-- MOVIES
+-- ============================================================================
+
+CREATE TABLE movies (
+    id           VARCHAR(255) PRIMARY KEY,
+    title        VARCHAR(500) NOT NULL,
+    description  TEXT,
+    release_year INTEGER,
+    director     VARCHAR(255),
+    created_by   VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT chk_movie_release_year CHECK (release_year IS NULL OR (release_year >= 1888 AND release_year <= 2100))
+);
+
+CREATE INDEX idx_movies_created_by ON movies(created_by);
+CREATE INDEX idx_movies_title ON movies(title);
+
+CREATE TRIGGER update_movies_updated_at BEFORE UPDATE ON movies
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+COMMENT ON TABLE movies IS 'Movies that require music licensing for their scenes';

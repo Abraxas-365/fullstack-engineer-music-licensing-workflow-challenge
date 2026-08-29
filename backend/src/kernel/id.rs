@@ -34,3 +34,4 @@ define_id!(UserId);
 define_id!(RoleId);
 define_id!(LabelId);
 define_id!(SongId);
+define_id!(MovieId);
