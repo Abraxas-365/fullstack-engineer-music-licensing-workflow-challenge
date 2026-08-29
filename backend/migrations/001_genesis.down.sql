@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS license_offers;
+DROP TABLE IF EXISTS license_requests;
 DROP TABLE IF EXISTS tracks;
 DROP TABLE IF EXISTS scenes;
 DROP TABLE IF EXISTS movie_members;

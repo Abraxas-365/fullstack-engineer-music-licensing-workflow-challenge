@@ -301,3 +301,59 @@ CREATE TRIGGER update_tracks_updated_at BEFORE UPDATE ON tracks
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 COMMENT ON TABLE tracks IS 'A song placement within a movie scene';
+
+-- ============================================================================
+-- LICENSE REQUESTS  (workflow for licensing a track)
+-- ============================================================================
+
+CREATE TABLE license_requests (
+    id               VARCHAR(255) PRIMARY KEY,
+    track_id         VARCHAR(255) NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
+    status           VARCHAR(50) NOT NULL DEFAULT 'DRAFT',
+    requested_by     VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    requested_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    resolved_by      VARCHAR(255) REFERENCES users(id) ON DELETE SET NULL,
+    resolved_at      TIMESTAMPTZ,
+    rejection_reason TEXT,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT chk_license_status CHECK (status IN ('DRAFT', 'REQUESTED', 'APPROVED', 'REJECTED', 'CANCELLED'))
+);
+
+CREATE INDEX idx_license_requests_track_id ON license_requests(track_id);
+CREATE INDEX idx_license_requests_status ON license_requests(status);
+CREATE INDEX idx_license_requests_requested_by ON license_requests(requested_by);
+
+CREATE TRIGGER update_license_requests_updated_at BEFORE UPDATE ON license_requests
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+COMMENT ON TABLE license_requests IS 'License workflow requests for song placements in scenes';
+
+-- ============================================================================
+-- LICENSE OFFERS  (offer / counter-offer negotiation history)
+-- ============================================================================
+
+CREATE TABLE license_offers (
+    id                  VARCHAR(255) PRIMARY KEY,
+    license_request_id  VARCHAR(255) NOT NULL REFERENCES license_requests(id) ON DELETE CASCADE,
+    offer_number        INTEGER NOT NULL,
+    side                VARCHAR(50) NOT NULL,
+    proposed_by         VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    license_fee         DOUBLE PRECISION,
+    currency            VARCHAR(10),
+    territory           TEXT,
+    media_rights        TEXT,
+    license_start       TIMESTAMPTZ,
+    license_end         TIMESTAMPTZ,
+    exclusive           BOOLEAN NOT NULL DEFAULT FALSE,
+    notes               TEXT,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT chk_offer_side CHECK (side IN ('MOVIE_TEAM', 'RIGHTS_HOLDER')),
+    CONSTRAINT uq_license_offer UNIQUE (license_request_id, offer_number)
+);
+
+CREATE INDEX idx_license_offers_request_id ON license_offers(license_request_id);
+
+COMMENT ON TABLE license_offers IS 'Offer/counter-offer negotiation history for license requests';
