@@ -179,6 +179,9 @@ mod tests {
         async fn save(&self, _: &Movie) -> Result<(), AppError> {
             Ok(())
         }
+        async fn save_with_owner(&self, _: &Movie, _: &MovieMember) -> Result<(), AppError> {
+            Ok(())
+        }
         async fn get_by_id(&self, id: &MovieId) -> Result<Option<Movie>, AppError> {
             let movies = self.movies.lock().await;
             Ok(movies.iter().find(|m| m.id == *id).cloned())

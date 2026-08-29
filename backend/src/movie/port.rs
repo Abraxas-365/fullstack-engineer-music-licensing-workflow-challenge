@@ -6,6 +6,9 @@ use super::model::{Movie, MovieFilter, MovieMember};
 #[async_trait::async_trait]
 pub trait MovieRepository: Send + Sync {
     async fn save(&self, movie: &Movie) -> Result<(), AppError>;
+    /// Atomically persist a movie together with its owner membership.
+    /// The "every movie has an owner" invariant must never be observable as broken.
+    async fn save_with_owner(&self, movie: &Movie, owner: &MovieMember) -> Result<(), AppError>;
     async fn get_by_id(&self, id: &MovieId) -> Result<Option<Movie>, AppError>;
     async fn find(
         &self,

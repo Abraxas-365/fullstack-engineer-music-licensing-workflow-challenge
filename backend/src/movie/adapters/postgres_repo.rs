@@ -71,6 +71,45 @@ impl MovieRepository for PostgresMovieRepository {
         Ok(())
     }
 
+    async fn save_with_owner(&self, movie: &Movie, owner: &MovieMember) -> Result<(), AppError> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| AppError::internal(e.to_string()))?;
+
+        sqlx::query(&format!(
+            "INSERT INTO movies ({MOVIE_COLUMNS}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
+        ))
+        .bind(movie.id.as_str())
+        .bind(&movie.title)
+        .bind(&movie.description)
+        .bind(movie.release_year)
+        .bind(&movie.director)
+        .bind(movie.created_by.as_str())
+        .bind(movie.created_at)
+        .bind(movie.updated_at)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
+
+        sqlx::query(
+            "INSERT INTO movie_members (movie_id, user_id, role, joined_at) VALUES ($1, $2, $3, $4)",
+        )
+        .bind(owner.movie_id.as_str())
+        .bind(owner.user_id.as_str())
+        .bind(owner.role.as_str())
+        .bind(owner.joined_at)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
+
+        tx.commit()
+            .await
+            .map_err(|e| AppError::internal(e.to_string()))?;
+        Ok(())
+    }
+
     async fn get_by_id(&self, id: &MovieId) -> Result<Option<Movie>, AppError> {
         let row = sqlx::query(&format!("SELECT {MOVIE_COLUMNS} FROM movies WHERE id = $1"))
             .bind(id.as_str())

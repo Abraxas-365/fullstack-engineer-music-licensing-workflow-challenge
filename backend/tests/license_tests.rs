@@ -365,6 +365,32 @@ async fn test_repo_get_latest_offer() {
     assert_eq!(latest.license_fee, Some(9999.0));
 }
 
+#[tokio::test]
+async fn test_repo_save_with_offer_rolls_back_on_offer_failure() {
+    let ctx = TestContext::new().await;
+    let (track, owner, _, _) = ctx.setup_track().await;
+
+    let license = backend::license::LicenseRequest::new(track.id.clone(), owner.id.clone());
+    // Nonexistent proposer -> FK violation on the offer insert, inside the tx.
+    let bad_offer = backend::license::LicenseOffer::new(
+        license.id.clone(),
+        1,
+        NegotiationSide::MovieTeam,
+        backend::kernel::UserId::new(),
+    );
+    let result = ctx.license_repo.save_with_offer(&license, &bad_offer).await;
+    assert!(result.is_err());
+
+    // The request insert must have been rolled back too — no orphan request.
+    assert!(
+        ctx.license_repo
+            .get_by_id(&license.id)
+            .await
+            .unwrap()
+            .is_none()
+    );
+}
+
 // ============================================================================
 // Service: Create
 // ============================================================================
