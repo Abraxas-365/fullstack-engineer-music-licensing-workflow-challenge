@@ -176,3 +176,32 @@ CREATE INDEX idx_label_members_label_id ON label_members(label_id);
 CREATE INDEX idx_label_members_user_id ON label_members(user_id);
 
 COMMENT ON TABLE label_members IS 'Users belonging to a label (owners, reps, artists)';
+
+-- ============================================================================
+-- SONGS
+-- ============================================================================
+
+CREATE TABLE songs (
+    id               VARCHAR(255) PRIMARY KEY,
+    title            VARCHAR(500) NOT NULL,
+    artist_id        VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    label_id         VARCHAR(255) REFERENCES labels(id) ON DELETE SET NULL,
+    album            VARCHAR(500),
+    duration_seconds INTEGER NOT NULL,
+    genre            VARCHAR(100),
+    isrc             VARCHAR(20),
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT chk_song_duration CHECK (duration_seconds > 0)
+);
+
+CREATE INDEX idx_songs_artist_id ON songs(artist_id);
+CREATE INDEX idx_songs_label_id ON songs(label_id);
+CREATE INDEX idx_songs_title ON songs(title);
+CREATE INDEX idx_songs_genre ON songs(genre);
+
+CREATE TRIGGER update_songs_updated_at BEFORE UPDATE ON songs
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+COMMENT ON TABLE songs IS 'Musical works available for licensing';
