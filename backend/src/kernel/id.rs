@@ -32,3 +32,4 @@ macro_rules! define_id {
 
 define_id!(UserId);
 define_id!(RoleId);
+define_id!(LabelId);

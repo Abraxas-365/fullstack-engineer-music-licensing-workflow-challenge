@@ -135,3 +135,44 @@ CREATE INDEX idx_refresh_tokens_session_id ON refresh_tokens(session_id);
 CREATE INDEX idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
 
 COMMENT ON TABLE refresh_tokens IS 'JWT refresh tokens, linked to a session for token rotation';
+
+-- ============================================================================
+-- LABELS
+-- ============================================================================
+
+CREATE TABLE labels (
+    id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    website TEXT,
+    contact_email VARCHAR(255),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT uq_labels_name UNIQUE (name)
+);
+
+CREATE INDEX idx_labels_name ON labels(name);
+
+CREATE TRIGGER update_labels_updated_at BEFORE UPDATE ON labels
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+COMMENT ON TABLE labels IS 'Music labels / record companies';
+
+-- ============================================================================
+-- LABEL MEMBERS
+-- ============================================================================
+
+CREATE TABLE label_members (
+    label_id VARCHAR(255) NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
+    user_id  VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role     VARCHAR(50) NOT NULL DEFAULT 'REP',
+    joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    PRIMARY KEY (label_id, user_id),
+    CONSTRAINT chk_label_role CHECK (role IN ('OWNER', 'REP', 'ARTIST'))
+);
+
+CREATE INDEX idx_label_members_label_id ON label_members(label_id);
+CREATE INDEX idx_label_members_user_id ON label_members(user_id);
+
+COMMENT ON TABLE label_members IS 'Users belonging to a label (owners, reps, artists)';
