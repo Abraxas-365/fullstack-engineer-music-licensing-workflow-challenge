@@ -3,9 +3,7 @@ mod common;
 use std::sync::Arc;
 
 use backend::iam::role::adapters::PostgresRoleRepository;
-use backend::iam::role::{
-    CreateRoleRequest, RoleRepository, RoleService, UpdateRoleRequest,
-};
+use backend::iam::role::{CreateRoleRequest, RoleRepository, RoleService, UpdateRoleRequest};
 use backend::iam::user::adapters::PostgresUserRepository;
 use backend::iam::user::{User, UserRepository};
 use backend::kernel::RoleId;
@@ -112,7 +110,8 @@ async fn test_delete_role() {
     let db = TestDb::new().await;
     let repo = PostgresRoleRepository::new(db.pool.clone());
 
-    let role = backend::iam::role::Role::new("Deletable".into(), "".into(), vec!["users:read".into()]);
+    let role =
+        backend::iam::role::Role::new("Deletable".into(), "".into(), vec!["users:read".into()]);
     let role_id = role.id.clone();
     repo.save(&role).await.unwrap();
 
@@ -168,14 +167,22 @@ async fn test_unassign_from_user() {
     let role_repo = PostgresRoleRepository::new(db.pool.clone());
     let user_repo = PostgresUserRepository::new(db.pool.clone());
 
-    let user = User::new_with_password("unassign@example.com".into(), "Unassign".into(), "hash".into());
+    let user = User::new_with_password(
+        "unassign@example.com".into(),
+        "Unassign".into(),
+        "hash".into(),
+    );
     user_repo.save(&user).await.unwrap();
 
-    let role = backend::iam::role::Role::new("Removable".into(), "".into(), vec!["users:read".into()]);
+    let role =
+        backend::iam::role::Role::new("Removable".into(), "".into(), vec!["users:read".into()]);
     role_repo.save(&role).await.unwrap();
     role_repo.assign_to_user(&user.id, &role.id).await.unwrap();
 
-    role_repo.unassign_from_user(&user.id, &role.id).await.unwrap();
+    role_repo
+        .unassign_from_user(&user.id, &role.id)
+        .await
+        .unwrap();
     let roles = role_repo.list_by_user(&user.id).await.unwrap();
     assert!(roles.is_empty());
 }
@@ -186,10 +193,15 @@ async fn test_delete_role_cascades_assignments() {
     let role_repo = PostgresRoleRepository::new(db.pool.clone());
     let user_repo = PostgresUserRepository::new(db.pool.clone());
 
-    let user = User::new_with_password("cascade@example.com".into(), "Cascade".into(), "hash".into());
+    let user = User::new_with_password(
+        "cascade@example.com".into(),
+        "Cascade".into(),
+        "hash".into(),
+    );
     user_repo.save(&user).await.unwrap();
 
-    let role = backend::iam::role::Role::new("CascadeRole".into(), "".into(), vec!["users:read".into()]);
+    let role =
+        backend::iam::role::Role::new("CascadeRole".into(), "".into(), vec!["users:read".into()]);
     let role_id = role.id.clone();
     role_repo.save(&role).await.unwrap();
     role_repo.assign_to_user(&user.id, &role_id).await.unwrap();
@@ -322,20 +334,27 @@ async fn test_service_assign_role_and_get_user_roles() {
     let user_repo = Arc::new(PostgresUserRepository::new(db.pool.clone()));
     let svc = RoleService::new(role_repo, user_repo.clone());
 
-    let user = User::new_with_password("roles@example.com".into(), "RoleUser".into(), "hash".into());
+    let user =
+        User::new_with_password("roles@example.com".into(), "RoleUser".into(), "hash".into());
     user_repo.save(&user).await.unwrap();
 
-    let r1 = svc.create_role(CreateRoleRequest {
-        name: "R1".into(),
-        description: None,
-        scopes: vec!["users:read".into()],
-    }).await.unwrap();
+    let r1 = svc
+        .create_role(CreateRoleRequest {
+            name: "R1".into(),
+            description: None,
+            scopes: vec!["users:read".into()],
+        })
+        .await
+        .unwrap();
 
-    let r2 = svc.create_role(CreateRoleRequest {
-        name: "R2".into(),
-        description: None,
-        scopes: vec!["roles:read".into(), "users:read".into()],
-    }).await.unwrap();
+    let r2 = svc
+        .create_role(CreateRoleRequest {
+            name: "R2".into(),
+            description: None,
+            scopes: vec!["roles:read".into(), "users:read".into()],
+        })
+        .await
+        .unwrap();
 
     svc.assign_role_to_user(&r1.id, &user.id).await.unwrap();
     svc.assign_role_to_user(&r2.id, &user.id).await.unwrap();
@@ -343,11 +362,23 @@ async fn test_service_assign_role_and_get_user_roles() {
     let user_roles = svc.get_user_roles(&user.id).await.unwrap();
     assert_eq!(user_roles.roles.len(), 2);
     // Effective scopes should be deduplicated
-    assert!(user_roles.effective_scopes.contains(&"users:read".to_string()));
-    assert!(user_roles.effective_scopes.contains(&"roles:read".to_string()));
+    assert!(
+        user_roles
+            .effective_scopes
+            .contains(&"users:read".to_string())
+    );
+    assert!(
+        user_roles
+            .effective_scopes
+            .contains(&"roles:read".to_string())
+    );
     // "users:read" appears in both roles but should only show once
     assert_eq!(
-        user_roles.effective_scopes.iter().filter(|s| *s == "users:read").count(),
+        user_roles
+            .effective_scopes
+            .iter()
+            .filter(|s| *s == "users:read")
+            .count(),
         1
     );
 }
@@ -359,13 +390,19 @@ async fn test_service_assign_role_user_not_found() {
     let user_repo = Arc::new(PostgresUserRepository::new(db.pool.clone()));
     let svc = RoleService::new(role_repo, user_repo);
 
-    let role = svc.create_role(CreateRoleRequest {
-        name: "Ghost".into(),
-        description: None,
-        scopes: vec!["users:read".into()],
-    }).await.unwrap();
+    let role = svc
+        .create_role(CreateRoleRequest {
+            name: "Ghost".into(),
+            description: None,
+            scopes: vec!["users:read".into()],
+        })
+        .await
+        .unwrap();
 
-    let err = svc.assign_role_to_user(&role.id, &backend::kernel::UserId::new()).await.unwrap_err();
+    let err = svc
+        .assign_role_to_user(&role.id, &backend::kernel::UserId::new())
+        .await
+        .unwrap_err();
     assert_eq!(err.code, "user.not_found");
 }
 
@@ -379,14 +416,19 @@ async fn test_service_unassign_role() {
     let user = User::new_with_password("unsvc@example.com".into(), "Unsvc".into(), "hash".into());
     user_repo.save(&user).await.unwrap();
 
-    let role = svc.create_role(CreateRoleRequest {
-        name: "Temp".into(),
-        description: None,
-        scopes: vec!["users:read".into()],
-    }).await.unwrap();
+    let role = svc
+        .create_role(CreateRoleRequest {
+            name: "Temp".into(),
+            description: None,
+            scopes: vec!["users:read".into()],
+        })
+        .await
+        .unwrap();
 
     svc.assign_role_to_user(&role.id, &user.id).await.unwrap();
-    svc.unassign_role_from_user(&role.id, &user.id).await.unwrap();
+    svc.unassign_role_from_user(&role.id, &user.id)
+        .await
+        .unwrap();
 
     let user_roles = svc.get_user_roles(&user.id).await.unwrap();
     assert!(user_roles.roles.is_empty());

@@ -4,7 +4,11 @@ pub struct AuthError;
 
 impl AuthError {
     pub fn unauthorized() -> AppError {
-        AppError::new("auth.unauthorized", "Unauthorized", ErrorType::Authorization)
+        AppError::new(
+            "auth.unauthorized",
+            "Unauthorized",
+            ErrorType::Authorization,
+        )
     }
 
     pub fn invalid_credentials() -> AppError {

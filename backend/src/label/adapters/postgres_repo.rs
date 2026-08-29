@@ -194,9 +194,9 @@ fn label_from_row(row: &sqlx::postgres::PgRow) -> Result<Label, AppError> {
         website: row
             .try_get("website")
             .map_err(|e| AppError::internal(format!("Failed to read column 'website': {e}")))?,
-        contact_email: row
-            .try_get("contact_email")
-            .map_err(|e| AppError::internal(format!("Failed to read column 'contact_email': {e}")))?,
+        contact_email: row.try_get("contact_email").map_err(|e| {
+            AppError::internal(format!("Failed to read column 'contact_email': {e}"))
+        })?,
         created_at: row
             .try_get("created_at")
             .map_err(|e| AppError::internal(format!("Failed to read column 'created_at': {e}")))?,
@@ -213,8 +213,9 @@ fn member_from_row(row: &sqlx::postgres::PgRow) -> Result<LabelMember, AppError>
 
     Ok(LabelMember {
         label_id: LabelId::from_string(
-            row.try_get("label_id")
-                .map_err(|e| AppError::internal(format!("Failed to read column 'label_id': {e}")))?,
+            row.try_get("label_id").map_err(|e| {
+                AppError::internal(format!("Failed to read column 'label_id': {e}"))
+            })?,
         ),
         user_id: UserId::from_string(
             row.try_get("user_id")

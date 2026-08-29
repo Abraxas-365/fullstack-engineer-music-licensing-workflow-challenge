@@ -61,11 +61,13 @@ impl TokenRepository for PostgresTokenRepository {
     }
 
     async fn revoke_all_for_user(&self, user_id: &UserId) -> Result<(), AppError> {
-        sqlx::query("UPDATE refresh_tokens SET is_revoked = true WHERE user_id = $1 AND is_revoked = false")
-            .bind(user_id.as_str())
-            .execute(&self.pool)
-            .await
-            .map_err(|e| AppError::internal(format!("Database error: {e}")))?;
+        sqlx::query(
+            "UPDATE refresh_tokens SET is_revoked = true WHERE user_id = $1 AND is_revoked = false",
+        )
+        .bind(user_id.as_str())
+        .execute(&self.pool)
+        .await
+        .map_err(|e| AppError::internal(format!("Database error: {e}")))?;
 
         Ok(())
     }

@@ -67,10 +67,8 @@ pub struct CreateSongRequest {
 impl CreateSongRequest {
     pub fn validate(&self) -> Result<(), crate::error::AppError> {
         if self.title.trim().is_empty() {
-            return Err(
-                crate::error::AppError::validation("Title is required")
-                    .with_detail("field", "title"),
-            );
+            return Err(crate::error::AppError::validation("Title is required")
+                .with_detail("field", "title"));
         }
         if self.duration_seconds <= 0 {
             return Err(
@@ -95,10 +93,8 @@ impl UpdateSongRequest {
     pub fn validate(&self) -> Result<(), crate::error::AppError> {
         if let Some(title) = &self.title {
             if title.trim().is_empty() {
-                return Err(
-                    crate::error::AppError::validation("Title cannot be empty")
-                        .with_detail("field", "title"),
-                );
+                return Err(crate::error::AppError::validation("Title cannot be empty")
+                    .with_detail("field", "title"));
             }
         }
         if let Some(dur) = self.duration_seconds {

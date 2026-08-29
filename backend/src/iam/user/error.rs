@@ -8,15 +8,27 @@ impl UserError {
     }
 
     pub fn already_exists() -> AppError {
-        AppError::new("user.already_exists", "User already exists", ErrorType::Conflict)
+        AppError::new(
+            "user.already_exists",
+            "User already exists",
+            ErrorType::Conflict,
+        )
     }
 
     pub fn invalid_credentials() -> AppError {
-        AppError::new("user.invalid_credentials", "Invalid credentials", ErrorType::Authorization)
+        AppError::new(
+            "user.invalid_credentials",
+            "Invalid credentials",
+            ErrorType::Authorization,
+        )
     }
 
     pub fn email_not_verified() -> AppError {
-        AppError::new("user.email_not_verified", "Email not verified", ErrorType::Business)
+        AppError::new(
+            "user.email_not_verified",
+            "Email not verified",
+            ErrorType::Business,
+        )
     }
 
     pub fn suspended() -> AppError {
@@ -24,10 +36,18 @@ impl UserError {
     }
 
     pub fn onboarding_required() -> AppError {
-        AppError::new("user.onboarding_required", "Onboarding required", ErrorType::Business)
+        AppError::new(
+            "user.onboarding_required",
+            "Onboarding required",
+            ErrorType::Business,
+        )
     }
 
     pub fn invalid_status() -> AppError {
-        AppError::new("user.invalid_status", "Invalid user status for this operation", ErrorType::Business)
+        AppError::new(
+            "user.invalid_status",
+            "Invalid user status for this operation",
+            ErrorType::Business,
+        )
     }
 }

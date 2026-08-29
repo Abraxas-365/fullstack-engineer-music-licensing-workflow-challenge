@@ -134,8 +134,8 @@ fn session_from_row(row: &sqlx::postgres::PgRow) -> Result<UserSession, AppError
         created_at: row
             .try_get("created_at")
             .map_err(|e| AppError::internal(format!("Failed to read column 'created_at': {e}")))?,
-        last_activity: row
-            .try_get("last_activity")
-            .map_err(|e| AppError::internal(format!("Failed to read column 'last_activity': {e}")))?,
+        last_activity: row.try_get("last_activity").map_err(|e| {
+            AppError::internal(format!("Failed to read column 'last_activity': {e}"))
+        })?,
     })
 }

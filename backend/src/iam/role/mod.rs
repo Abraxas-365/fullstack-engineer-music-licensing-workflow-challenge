@@ -1,6 +1,6 @@
 pub mod adapters;
-pub mod model;
 mod error;
+pub mod model;
 mod port;
 mod service;
 

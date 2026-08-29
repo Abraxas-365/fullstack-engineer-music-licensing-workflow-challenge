@@ -95,10 +95,8 @@ impl CreateRoleRequest {
             );
         }
         if self.scopes.is_empty() {
-            return Err(
-                AppError::validation("At least one scope is required")
-                    .with_detail("field", "scopes"),
-            );
+            return Err(AppError::validation("At least one scope is required")
+                .with_detail("field", "scopes"));
         }
         Ok(())
     }
@@ -115,10 +113,8 @@ impl UpdateRoleRequest {
     pub fn validate(&self) -> Result<(), AppError> {
         if let Some(name) = &self.name {
             if name.trim().len() < 2 {
-                return Err(
-                    AppError::validation("Name must be at least 2 characters")
-                        .with_detail("field", "name"),
-                );
+                return Err(AppError::validation("Name must be at least 2 characters")
+                    .with_detail("field", "name"));
             }
         }
         Ok(())
@@ -133,9 +129,7 @@ pub struct AssignRoleRequest {
 impl AssignRoleRequest {
     pub fn validate(&self) -> Result<(), AppError> {
         if self.user_id.as_str().is_empty() {
-            return Err(
-                AppError::validation("User ID is required").with_detail("field", "user_id"),
-            );
+            return Err(AppError::validation("User ID is required").with_detail("field", "user_id"));
         }
         Ok(())
     }

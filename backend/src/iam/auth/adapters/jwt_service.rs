@@ -1,4 +1,4 @@
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 
 use crate::error::AppError;
@@ -77,17 +77,13 @@ impl TokenService for JwtTokenService {
         };
 
         encode(&Header::default(), &jwt_claims, &self.encoding_key)
-            .map_err(|e| {
-                AuthError::token_generation_failed()
-                    .with_detail("error", e.to_string())
-            })
+            .map_err(|e| AuthError::token_generation_failed().with_detail("error", e.to_string()))
     }
 
     fn validate_access_token(&self, token: &str) -> Result<TokenClaims, AppError> {
-        let data = decode::<AccessClaims>(token, &self.decoding_key, &self.validation())
-            .map_err(|e| {
-                AuthError::token_validation_failed()
-                    .with_detail("error", e.to_string())
+        let data =
+            decode::<AccessClaims>(token, &self.decoding_key, &self.validation()).map_err(|e| {
+                AuthError::token_validation_failed().with_detail("error", e.to_string())
             })?;
 
         Ok(TokenClaims {
@@ -109,18 +105,13 @@ impl TokenService for JwtTokenService {
         };
 
         encode(&Header::default(), &claims, &self.encoding_key)
-            .map_err(|e| {
-                AuthError::token_generation_failed()
-                    .with_detail("error", e.to_string())
-            })
+            .map_err(|e| AuthError::token_generation_failed().with_detail("error", e.to_string()))
     }
 
     fn validate_refresh_token(&self, token: &str) -> Result<UserId, AppError> {
-        let data = decode::<RefreshClaims>(token, &self.decoding_key, &self.validation())
-            .map_err(|e| {
-                AuthError::token_validation_failed()
-                    .with_detail("error", e.to_string())
-            })?;
+        let data = decode::<RefreshClaims>(token, &self.decoding_key, &self.validation()).map_err(
+            |e| AuthError::token_validation_failed().with_detail("error", e.to_string()),
+        )?;
 
         Ok(UserId::from_string(data.claims.sub))
     }

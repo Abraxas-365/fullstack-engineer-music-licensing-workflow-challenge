@@ -3,12 +3,12 @@ mod common;
 use std::sync::Arc;
 
 use backend::iam::user::adapters::{BcryptPasswordService, PostgresUserRepository};
+use backend::iam::user::model::UserFilter;
 use backend::iam::user::{
     CreateUserRequest, OAuthProvider, PasswordService, UpdateUserRequest, User, UserRepository,
     UserService, UserStatus,
 };
 use backend::kernel::{PaginationOptions, UserId};
-use backend::iam::user::model::UserFilter;
 
 use common::TestDb;
 
@@ -80,11 +80,8 @@ async fn test_get_by_email() {
     let db = TestDb::new().await;
     let repo = PostgresUserRepository::new(db.pool.clone());
 
-    let user = User::new_with_password(
-        "find@example.com".into(),
-        "Find Me".into(),
-        "hashed".into(),
-    );
+    let user =
+        User::new_with_password("find@example.com".into(), "Find Me".into(), "hashed".into());
     repo.save(&user).await.unwrap();
 
     let found = repo.get_by_email("find@example.com").await.unwrap();
@@ -150,7 +147,10 @@ async fn test_find_with_pagination() {
         repo.save(&user).await.unwrap();
     }
 
-    let opts = PaginationOptions { page: 1, page_size: 2 };
+    let opts = PaginationOptions {
+        page: 1,
+        page_size: 2,
+    };
     let filter = UserFilter::default();
     let page = repo.find(&opts, &filter).await.unwrap();
 

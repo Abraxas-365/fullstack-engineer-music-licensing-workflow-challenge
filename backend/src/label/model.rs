@@ -108,10 +108,8 @@ impl UpdateLabelRequest {
     pub fn validate(&self) -> Result<(), AppError> {
         if let Some(name) = &self.name {
             if name.trim().len() < 2 {
-                return Err(
-                    AppError::validation("Name must be at least 2 characters")
-                        .with_detail("field", "name"),
-                );
+                return Err(AppError::validation("Name must be at least 2 characters")
+                    .with_detail("field", "name"));
             }
         }
         Ok(())

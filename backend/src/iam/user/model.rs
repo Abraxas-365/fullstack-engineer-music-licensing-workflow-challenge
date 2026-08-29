@@ -140,8 +140,10 @@ impl User {
 
     pub fn activate(&mut self) -> Result<(), AppError> {
         if self.status != UserStatus::Pending {
-            return Err(super::UserError::invalid_status()
-                .with_detail("current_status", serde_json::to_value(&self.status).unwrap()));
+            return Err(super::UserError::invalid_status().with_detail(
+                "current_status",
+                serde_json::to_value(&self.status).unwrap(),
+            ));
         }
         self.status = UserStatus::Active;
         self.updated_at = Utc::now();
@@ -150,8 +152,10 @@ impl User {
 
     pub fn suspend(&mut self, _reason: &str) -> Result<(), AppError> {
         if !self.is_active() {
-            return Err(super::UserError::invalid_status()
-                .with_detail("current_status", serde_json::to_value(&self.status).unwrap()));
+            return Err(super::UserError::invalid_status().with_detail(
+                "current_status",
+                serde_json::to_value(&self.status).unwrap(),
+            ));
         }
         self.status = UserStatus::Suspended;
         self.updated_at = Utc::now();
@@ -248,9 +252,7 @@ pub struct SuspendUserRequest {
 impl SuspendUserRequest {
     pub fn validate(&self) -> Result<(), AppError> {
         if self.reason.trim().is_empty() {
-            return Err(
-                AppError::validation("Reason is required").with_detail("field", "reason")
-            );
+            return Err(AppError::validation("Reason is required").with_detail("field", "reason"));
         }
         Ok(())
     }

@@ -18,10 +18,7 @@ pub struct LabelService {
 }
 
 impl LabelService {
-    pub fn new(
-        label_repo: Arc<dyn LabelRepository>,
-        user_repo: Arc<dyn UserRepository>,
-    ) -> Self {
+    pub fn new(label_repo: Arc<dyn LabelRepository>, user_repo: Arc<dyn UserRepository>) -> Self {
         Self {
             label_repo,
             user_repo,
@@ -150,10 +147,7 @@ impl LabelService {
         self.label_repo.remove_member(label_id, user_id).await
     }
 
-    pub async fn list_members(
-        &self,
-        label_id: &LabelId,
-    ) -> Result<Vec<LabelMember>, AppError> {
+    pub async fn list_members(&self, label_id: &LabelId) -> Result<Vec<LabelMember>, AppError> {
         self.get_label(label_id).await?;
         self.label_repo.list_members(label_id).await
     }
@@ -166,8 +160,8 @@ impl LabelService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::iam::user::{User, UserRepository};
     use crate::iam::user::model::UserFilter;
+    use crate::iam::user::{User, UserRepository};
     use crate::kernel::{Paginated, PaginationOptions};
     use tokio::sync::Mutex;
 
@@ -182,53 +176,102 @@ mod tests {
 
     impl MockLabelRepo {
         fn new() -> Self {
-            Self { labels: Mutex::new(Vec::new()), members: Mutex::new(Vec::new()) }
+            Self {
+                labels: Mutex::new(Vec::new()),
+                members: Mutex::new(Vec::new()),
+            }
         }
     }
 
     #[async_trait::async_trait]
     impl LabelRepository for MockLabelRepo {
         async fn save(&self, label: &Label) -> Result<(), AppError> {
-            self.labels.lock().await.push(label.clone()); Ok(())
+            self.labels.lock().await.push(label.clone());
+            Ok(())
         }
         async fn get_by_id(&self, id: &LabelId) -> Result<Option<Label>, AppError> {
-            Ok(self.labels.lock().await.iter().find(|l| l.id == *id).cloned())
+            Ok(self
+                .labels
+                .lock()
+                .await
+                .iter()
+                .find(|l| l.id == *id)
+                .cloned())
         }
         async fn get_by_name(&self, name: &str) -> Result<Option<Label>, AppError> {
-            Ok(self.labels.lock().await.iter().find(|l| l.name == name).cloned())
+            Ok(self
+                .labels
+                .lock()
+                .await
+                .iter()
+                .find(|l| l.name == name)
+                .cloned())
         }
         async fn list_all(&self) -> Result<Vec<Label>, AppError> {
             Ok(self.labels.lock().await.clone())
         }
         async fn update(&self, label: &Label) -> Result<(), AppError> {
             let mut labels = self.labels.lock().await;
-            if let Some(l) = labels.iter_mut().find(|l| l.id == label.id) { *l = label.clone(); }
+            if let Some(l) = labels.iter_mut().find(|l| l.id == label.id) {
+                *l = label.clone();
+            }
             Ok(())
         }
         async fn delete(&self, id: &LabelId) -> Result<(), AppError> {
-            self.labels.lock().await.retain(|l| l.id != *id); Ok(())
+            self.labels.lock().await.retain(|l| l.id != *id);
+            Ok(())
         }
         async fn add_member(&self, member: &LabelMember) -> Result<(), AppError> {
-            self.members.lock().await.push(member.clone()); Ok(())
+            self.members.lock().await.push(member.clone());
+            Ok(())
         }
-        async fn remove_member(&self, label_id: &LabelId, user_id: &UserId) -> Result<(), AppError> {
-            self.members.lock().await.retain(|m| !(m.label_id == *label_id && m.user_id == *user_id)); Ok(())
+        async fn remove_member(
+            &self,
+            label_id: &LabelId,
+            user_id: &UserId,
+        ) -> Result<(), AppError> {
+            self.members
+                .lock()
+                .await
+                .retain(|m| !(m.label_id == *label_id && m.user_id == *user_id));
+            Ok(())
         }
-        async fn get_member(&self, label_id: &LabelId, user_id: &UserId) -> Result<Option<LabelMember>, AppError> {
-            Ok(self.members.lock().await.iter()
-                .find(|m| m.label_id == *label_id && m.user_id == *user_id).cloned())
+        async fn get_member(
+            &self,
+            label_id: &LabelId,
+            user_id: &UserId,
+        ) -> Result<Option<LabelMember>, AppError> {
+            Ok(self
+                .members
+                .lock()
+                .await
+                .iter()
+                .find(|m| m.label_id == *label_id && m.user_id == *user_id)
+                .cloned())
         }
         async fn list_members(&self, label_id: &LabelId) -> Result<Vec<LabelMember>, AppError> {
-            Ok(self.members.lock().await.iter().filter(|m| m.label_id == *label_id).cloned().collect())
+            Ok(self
+                .members
+                .lock()
+                .await
+                .iter()
+                .filter(|m| m.label_id == *label_id)
+                .cloned()
+                .collect())
         }
         async fn get_user_labels(&self, user_id: &UserId) -> Result<Vec<Label>, AppError> {
             let members = self.members.lock().await;
-            let label_ids: Vec<LabelId> = members.iter()
+            let label_ids: Vec<LabelId> = members
+                .iter()
                 .filter(|m| m.user_id == *user_id)
                 .map(|m| m.label_id.clone())
                 .collect();
             let labels = self.labels.lock().await;
-            Ok(labels.iter().filter(|l| label_ids.contains(&l.id)).cloned().collect())
+            Ok(labels
+                .iter()
+                .filter(|l| label_ids.contains(&l.id))
+                .cloned()
+                .collect())
         }
     }
 
@@ -237,22 +280,48 @@ mod tests {
     }
 
     impl MockUserRepo {
-        fn new() -> Self { Self { users: Mutex::new(Vec::new()) } }
-        fn with_user(user: User) -> Self { Self { users: Mutex::new(vec![user]) } }
+        fn new() -> Self {
+            Self {
+                users: Mutex::new(Vec::new()),
+            }
+        }
+        fn with_user(user: User) -> Self {
+            Self {
+                users: Mutex::new(vec![user]),
+            }
+        }
     }
 
     #[async_trait::async_trait]
     impl UserRepository for MockUserRepo {
         async fn get_by_id(&self, id: &UserId) -> Result<Option<User>, AppError> {
-            Ok(self.users.lock().await.iter().find(|u| u.id == *id).cloned())
+            Ok(self
+                .users
+                .lock()
+                .await
+                .iter()
+                .find(|u| u.id == *id)
+                .cloned())
         }
-        async fn get_by_email(&self, _: &str) -> Result<Option<User>, AppError> { Ok(None) }
-        async fn find(&self, _: &PaginationOptions, _: &UserFilter) -> Result<Paginated<User>, AppError> {
+        async fn get_by_email(&self, _: &str) -> Result<Option<User>, AppError> {
+            Ok(None)
+        }
+        async fn find(
+            &self,
+            _: &PaginationOptions,
+            _: &UserFilter,
+        ) -> Result<Paginated<User>, AppError> {
             Ok(Paginated::new(vec![], 1, 10, 0))
         }
-        async fn save(&self, _: &User) -> Result<(), AppError> { Ok(()) }
-        async fn update(&self, _: &User) -> Result<(), AppError> { Ok(()) }
-        async fn delete(&self, _: &UserId) -> Result<(), AppError> { Ok(()) }
+        async fn save(&self, _: &User) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn update(&self, _: &User) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn delete(&self, _: &UserId) -> Result<(), AppError> {
+            Ok(())
+        }
     }
 
     fn make_svc(label_repo: MockLabelRepo, user_repo: MockUserRepo) -> LabelService {
@@ -260,7 +329,11 @@ mod tests {
     }
 
     fn create_req(name: &str) -> CreateLabelRequest {
-        CreateLabelRequest { name: name.into(), website: None, contact_email: None }
+        CreateLabelRequest {
+            name: name.into(),
+            website: None,
+            contact_email: None,
+        }
     }
 
     fn make_user() -> User {
@@ -329,9 +402,17 @@ mod tests {
     async fn update_label_success() {
         let svc = make_svc(MockLabelRepo::new(), MockUserRepo::new());
         let created = svc.create_label(create_req("Old")).await.unwrap();
-        let updated = svc.update_label(&created.id, UpdateLabelRequest {
-            name: Some("New".into()), website: Some("https://new.com".into()), contact_email: None,
-        }).await.unwrap();
+        let updated = svc
+            .update_label(
+                &created.id,
+                UpdateLabelRequest {
+                    name: Some("New".into()),
+                    website: Some("https://new.com".into()),
+                    contact_email: None,
+                },
+            )
+            .await
+            .unwrap();
         assert_eq!(updated.name, "New");
         assert_eq!(updated.website.as_deref(), Some("https://new.com"));
     }
@@ -339,9 +420,17 @@ mod tests {
     #[tokio::test]
     async fn update_label_not_found() {
         let svc = make_svc(MockLabelRepo::new(), MockUserRepo::new());
-        let err = svc.update_label(&LabelId::new(), UpdateLabelRequest {
-            name: Some("Test".into()), website: None, contact_email: None,
-        }).await.unwrap_err();
+        let err = svc
+            .update_label(
+                &LabelId::new(),
+                UpdateLabelRequest {
+                    name: Some("Test".into()),
+                    website: None,
+                    contact_email: None,
+                },
+            )
+            .await
+            .unwrap_err();
         assert_eq!(err.code, "label.not_found");
     }
 
@@ -350,9 +439,17 @@ mod tests {
         let svc = make_svc(MockLabelRepo::new(), MockUserRepo::new());
         svc.create_label(create_req("Taken")).await.unwrap();
         let other = svc.create_label(create_req("Other")).await.unwrap();
-        let err = svc.update_label(&other.id, UpdateLabelRequest {
-            name: Some("Taken".into()), website: None, contact_email: None,
-        }).await.unwrap_err();
+        let err = svc
+            .update_label(
+                &other.id,
+                UpdateLabelRequest {
+                    name: Some("Taken".into()),
+                    website: None,
+                    contact_email: None,
+                },
+            )
+            .await
+            .unwrap_err();
         assert_eq!(err.code, "label.already_exists");
     }
 
@@ -386,9 +483,16 @@ mod tests {
         let user_id = user.id.clone();
         let svc = make_svc(MockLabelRepo::new(), MockUserRepo::with_user(user));
         let label = svc.create_label(create_req("Sony")).await.unwrap();
-        let member = svc.add_member(&label.id, AddMemberRequest {
-            user_id: user_id.clone(), role: Some("ARTIST".into()),
-        }).await.unwrap();
+        let member = svc
+            .add_member(
+                &label.id,
+                AddMemberRequest {
+                    user_id: user_id.clone(),
+                    role: Some("ARTIST".into()),
+                },
+            )
+            .await
+            .unwrap();
         assert_eq!(member.role, LabelRole::Artist);
     }
 
@@ -398,9 +502,16 @@ mod tests {
         let user_id = user.id.clone();
         let svc = make_svc(MockLabelRepo::new(), MockUserRepo::with_user(user));
         let label = svc.create_label(create_req("Sony")).await.unwrap();
-        let member = svc.add_member(&label.id, AddMemberRequest {
-            user_id: user_id.clone(), role: None,
-        }).await.unwrap();
+        let member = svc
+            .add_member(
+                &label.id,
+                AddMemberRequest {
+                    user_id: user_id.clone(),
+                    role: None,
+                },
+            )
+            .await
+            .unwrap();
         assert_eq!(member.role, LabelRole::Rep);
     }
 
@@ -408,9 +519,16 @@ mod tests {
     async fn add_member_label_not_found() {
         let user = make_user();
         let svc = make_svc(MockLabelRepo::new(), MockUserRepo::with_user(user.clone()));
-        let err = svc.add_member(&LabelId::new(), AddMemberRequest {
-            user_id: user.id.clone(), role: None,
-        }).await.unwrap_err();
+        let err = svc
+            .add_member(
+                &LabelId::new(),
+                AddMemberRequest {
+                    user_id: user.id.clone(),
+                    role: None,
+                },
+            )
+            .await
+            .unwrap_err();
         assert_eq!(err.code, "label.not_found");
     }
 
@@ -418,9 +536,16 @@ mod tests {
     async fn add_member_user_not_found() {
         let svc = make_svc(MockLabelRepo::new(), MockUserRepo::new());
         let label = svc.create_label(create_req("Sony")).await.unwrap();
-        let err = svc.add_member(&label.id, AddMemberRequest {
-            user_id: UserId::new(), role: None,
-        }).await.unwrap_err();
+        let err = svc
+            .add_member(
+                &label.id,
+                AddMemberRequest {
+                    user_id: UserId::new(),
+                    role: None,
+                },
+            )
+            .await
+            .unwrap_err();
         assert_eq!(err.code, "NOT_FOUND");
     }
 
@@ -430,8 +555,25 @@ mod tests {
         let user_id = user.id.clone();
         let svc = make_svc(MockLabelRepo::new(), MockUserRepo::with_user(user));
         let label = svc.create_label(create_req("Sony")).await.unwrap();
-        svc.add_member(&label.id, AddMemberRequest { user_id: user_id.clone(), role: None }).await.unwrap();
-        let err = svc.add_member(&label.id, AddMemberRequest { user_id: user_id.clone(), role: None }).await.unwrap_err();
+        svc.add_member(
+            &label.id,
+            AddMemberRequest {
+                user_id: user_id.clone(),
+                role: None,
+            },
+        )
+        .await
+        .unwrap();
+        let err = svc
+            .add_member(
+                &label.id,
+                AddMemberRequest {
+                    user_id: user_id.clone(),
+                    role: None,
+                },
+            )
+            .await
+            .unwrap_err();
         assert_eq!(err.code, "label.member_already_added");
     }
 
@@ -441,14 +583,25 @@ mod tests {
         let user_id = user.id.clone();
         let svc = make_svc(MockLabelRepo::new(), MockUserRepo::with_user(user));
         let label = svc.create_label(create_req("Sony")).await.unwrap();
-        svc.add_member(&label.id, AddMemberRequest { user_id: user_id.clone(), role: None }).await.unwrap();
+        svc.add_member(
+            &label.id,
+            AddMemberRequest {
+                user_id: user_id.clone(),
+                role: None,
+            },
+        )
+        .await
+        .unwrap();
         svc.remove_member(&label.id, &user_id).await.unwrap();
     }
 
     #[tokio::test]
     async fn remove_member_not_found() {
         let svc = make_svc(MockLabelRepo::new(), MockUserRepo::new());
-        let err = svc.remove_member(&LabelId::new(), &UserId::new()).await.unwrap_err();
+        let err = svc
+            .remove_member(&LabelId::new(), &UserId::new())
+            .await
+            .unwrap_err();
         assert_eq!(err.code, "label.member_not_found");
     }
 
@@ -458,7 +611,15 @@ mod tests {
         let user_id = user.id.clone();
         let svc = make_svc(MockLabelRepo::new(), MockUserRepo::with_user(user));
         let label = svc.create_label(create_req("Sony")).await.unwrap();
-        svc.add_member(&label.id, AddMemberRequest { user_id: user_id.clone(), role: None }).await.unwrap();
+        svc.add_member(
+            &label.id,
+            AddMemberRequest {
+                user_id: user_id.clone(),
+                role: None,
+            },
+        )
+        .await
+        .unwrap();
         let members = svc.list_members(&label.id).await.unwrap();
         assert_eq!(members.len(), 1);
     }
@@ -470,8 +631,24 @@ mod tests {
         let svc = make_svc(MockLabelRepo::new(), MockUserRepo::with_user(user));
         let l1 = svc.create_label(create_req("Sony")).await.unwrap();
         let l2 = svc.create_label(create_req("Warner")).await.unwrap();
-        svc.add_member(&l1.id, AddMemberRequest { user_id: user_id.clone(), role: None }).await.unwrap();
-        svc.add_member(&l2.id, AddMemberRequest { user_id: user_id.clone(), role: None }).await.unwrap();
+        svc.add_member(
+            &l1.id,
+            AddMemberRequest {
+                user_id: user_id.clone(),
+                role: None,
+            },
+        )
+        .await
+        .unwrap();
+        svc.add_member(
+            &l2.id,
+            AddMemberRequest {
+                user_id: user_id.clone(),
+                role: None,
+            },
+        )
+        .await
+        .unwrap();
         let labels = svc.get_user_labels(&user_id).await.unwrap();
         assert_eq!(labels.len(), 2);
     }

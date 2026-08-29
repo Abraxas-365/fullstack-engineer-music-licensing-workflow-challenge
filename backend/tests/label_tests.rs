@@ -88,8 +88,14 @@ async fn test_repo_get_by_id_not_found() {
 #[tokio::test]
 async fn test_repo_list_all() {
     let ctx = TestContext::new().await;
-    ctx.label_repo.save(&backend::label::Label::new("Alpha".into(), None, None)).await.unwrap();
-    ctx.label_repo.save(&backend::label::Label::new("Beta".into(), None, None)).await.unwrap();
+    ctx.label_repo
+        .save(&backend::label::Label::new("Alpha".into(), None, None))
+        .await
+        .unwrap();
+    ctx.label_repo
+        .save(&backend::label::Label::new("Beta".into(), None, None))
+        .await
+        .unwrap();
 
     let labels = ctx.label_repo.list_all().await.unwrap();
     assert_eq!(labels.len(), 2);
@@ -169,7 +175,12 @@ async fn test_repo_get_member() {
     };
     ctx.label_repo.add_member(&member).await.unwrap();
 
-    let found = ctx.label_repo.get_member(&label.id, &user.id).await.unwrap().unwrap();
+    let found = ctx
+        .label_repo
+        .get_member(&label.id, &user.id)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(found.role, LabelRole::Rep);
 }
 
@@ -187,9 +198,18 @@ async fn test_repo_remove_member() {
         joined_at: chrono::Utc::now(),
     };
     ctx.label_repo.add_member(&member).await.unwrap();
-    ctx.label_repo.remove_member(&label.id, &user.id).await.unwrap();
+    ctx.label_repo
+        .remove_member(&label.id, &user.id)
+        .await
+        .unwrap();
 
-    assert!(ctx.label_repo.get_member(&label.id, &user.id).await.unwrap().is_none());
+    assert!(
+        ctx.label_repo
+            .get_member(&label.id, &user.id)
+            .await
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[tokio::test]
@@ -350,13 +370,21 @@ async fn test_service_update_label_duplicate_name() {
     let ctx = TestContext::new().await;
 
     ctx.label_svc
-        .create_label(CreateLabelRequest { name: "Taken".into(), website: None, contact_email: None })
+        .create_label(CreateLabelRequest {
+            name: "Taken".into(),
+            website: None,
+            contact_email: None,
+        })
         .await
         .unwrap();
 
     let other = ctx
         .label_svc
-        .create_label(CreateLabelRequest { name: "Other".into(), website: None, contact_email: None })
+        .create_label(CreateLabelRequest {
+            name: "Other".into(),
+            website: None,
+            contact_email: None,
+        })
         .await
         .unwrap();
 
@@ -364,7 +392,11 @@ async fn test_service_update_label_duplicate_name() {
         .label_svc
         .update_label(
             &other.id,
-            UpdateLabelRequest { name: Some("Taken".into()), website: None, contact_email: None },
+            UpdateLabelRequest {
+                name: Some("Taken".into()),
+                website: None,
+                contact_email: None,
+            },
         )
         .await
         .unwrap_err();
@@ -378,7 +410,11 @@ async fn test_service_delete_label() {
 
     let label = ctx
         .label_svc
-        .create_label(CreateLabelRequest { name: "Delete Me".into(), website: None, contact_email: None })
+        .create_label(CreateLabelRequest {
+            name: "Delete Me".into(),
+            website: None,
+            contact_email: None,
+        })
         .await
         .unwrap();
 
@@ -398,7 +434,11 @@ async fn test_service_add_member() {
 
     let label = ctx
         .label_svc
-        .create_label(CreateLabelRequest { name: "Label".into(), website: None, contact_email: None })
+        .create_label(CreateLabelRequest {
+            name: "Label".into(),
+            website: None,
+            contact_email: None,
+        })
         .await
         .unwrap();
 
@@ -425,7 +465,11 @@ async fn test_service_add_member_default_role() {
 
     let label = ctx
         .label_svc
-        .create_label(CreateLabelRequest { name: "Label".into(), website: None, contact_email: None })
+        .create_label(CreateLabelRequest {
+            name: "Label".into(),
+            website: None,
+            contact_email: None,
+        })
         .await
         .unwrap();
 
@@ -435,7 +479,10 @@ async fn test_service_add_member_default_role() {
         .label_svc
         .add_member(
             &label.id,
-            AddMemberRequest { user_id: user.id.clone(), role: None },
+            AddMemberRequest {
+                user_id: user.id.clone(),
+                role: None,
+            },
         )
         .await
         .unwrap();
@@ -449,20 +496,36 @@ async fn test_service_add_member_duplicate() {
 
     let label = ctx
         .label_svc
-        .create_label(CreateLabelRequest { name: "Label".into(), website: None, contact_email: None })
+        .create_label(CreateLabelRequest {
+            name: "Label".into(),
+            website: None,
+            contact_email: None,
+        })
         .await
         .unwrap();
 
     let user = ctx.create_user("dupe@example.com").await;
 
     ctx.label_svc
-        .add_member(&label.id, AddMemberRequest { user_id: user.id.clone(), role: None })
+        .add_member(
+            &label.id,
+            AddMemberRequest {
+                user_id: user.id.clone(),
+                role: None,
+            },
+        )
         .await
         .unwrap();
 
     let err = ctx
         .label_svc
-        .add_member(&label.id, AddMemberRequest { user_id: user.id.clone(), role: None })
+        .add_member(
+            &label.id,
+            AddMemberRequest {
+                user_id: user.id.clone(),
+                role: None,
+            },
+        )
         .await
         .unwrap_err();
 
@@ -475,7 +538,11 @@ async fn test_service_add_member_user_not_found() {
 
     let label = ctx
         .label_svc
-        .create_label(CreateLabelRequest { name: "Label".into(), website: None, contact_email: None })
+        .create_label(CreateLabelRequest {
+            name: "Label".into(),
+            website: None,
+            contact_email: None,
+        })
         .await
         .unwrap();
 
@@ -504,7 +571,10 @@ async fn test_service_add_member_label_not_found() {
         .label_svc
         .add_member(
             &LabelId::new(),
-            AddMemberRequest { user_id: user.id.clone(), role: None },
+            AddMemberRequest {
+                user_id: user.id.clone(),
+                role: None,
+            },
         )
         .await
         .unwrap_err();
@@ -518,18 +588,31 @@ async fn test_service_remove_member() {
 
     let label = ctx
         .label_svc
-        .create_label(CreateLabelRequest { name: "Label".into(), website: None, contact_email: None })
+        .create_label(CreateLabelRequest {
+            name: "Label".into(),
+            website: None,
+            contact_email: None,
+        })
         .await
         .unwrap();
 
     let user = ctx.create_user("remove@example.com").await;
 
     ctx.label_svc
-        .add_member(&label.id, AddMemberRequest { user_id: user.id.clone(), role: None })
+        .add_member(
+            &label.id,
+            AddMemberRequest {
+                user_id: user.id.clone(),
+                role: None,
+            },
+        )
         .await
         .unwrap();
 
-    ctx.label_svc.remove_member(&label.id, &user.id).await.unwrap();
+    ctx.label_svc
+        .remove_member(&label.id, &user.id)
+        .await
+        .unwrap();
 
     let members = ctx.label_svc.list_members(&label.id).await.unwrap();
     assert_eq!(members.len(), 0);
@@ -541,7 +624,11 @@ async fn test_service_remove_member_not_found() {
 
     let label = ctx
         .label_svc
-        .create_label(CreateLabelRequest { name: "Label".into(), website: None, contact_email: None })
+        .create_label(CreateLabelRequest {
+            name: "Label".into(),
+            website: None,
+            contact_email: None,
+        })
         .await
         .unwrap();
 
@@ -562,24 +649,44 @@ async fn test_service_get_user_labels() {
 
     let label1 = ctx
         .label_svc
-        .create_label(CreateLabelRequest { name: "Label A".into(), website: None, contact_email: None })
+        .create_label(CreateLabelRequest {
+            name: "Label A".into(),
+            website: None,
+            contact_email: None,
+        })
         .await
         .unwrap();
 
     let label2 = ctx
         .label_svc
-        .create_label(CreateLabelRequest { name: "Label B".into(), website: None, contact_email: None })
+        .create_label(CreateLabelRequest {
+            name: "Label B".into(),
+            website: None,
+            contact_email: None,
+        })
         .await
         .unwrap();
 
     let user = ctx.create_user("multi@example.com").await;
 
     ctx.label_svc
-        .add_member(&label1.id, AddMemberRequest { user_id: user.id.clone(), role: Some("ARTIST".into()) })
+        .add_member(
+            &label1.id,
+            AddMemberRequest {
+                user_id: user.id.clone(),
+                role: Some("ARTIST".into()),
+            },
+        )
         .await
         .unwrap();
     ctx.label_svc
-        .add_member(&label2.id, AddMemberRequest { user_id: user.id.clone(), role: Some("ARTIST".into()) })
+        .add_member(
+            &label2.id,
+            AddMemberRequest {
+                user_id: user.id.clone(),
+                role: Some("ARTIST".into()),
+            },
+        )
         .await
         .unwrap();
 

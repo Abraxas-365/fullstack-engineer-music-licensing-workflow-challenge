@@ -3,10 +3,11 @@ mod common;
 use std::sync::Arc;
 use std::time::Duration;
 
-use backend::iam::auth::adapters::{JwtTokenService, PostgresSessionRepository, PostgresTokenRepository};
+use backend::iam::auth::adapters::{
+    JwtTokenService, PostgresSessionRepository, PostgresTokenRepository,
+};
 use backend::iam::auth::{
-    AuthConfig, AuthService, JWTConfig, LoginMetadata, LoginRequest, OAuthUserInfo,
-    TokenService,
+    AuthConfig, AuthService, JWTConfig, LoginMetadata, LoginRequest, OAuthUserInfo, TokenService,
 };
 use backend::iam::role::adapters::PostgresRoleRepository;
 use backend::iam::role::{CreateRoleRequest, RoleService};
@@ -169,12 +170,16 @@ async fn test_jwt_wrong_secret_rejected() {
 #[tokio::test]
 async fn test_login_success() {
     let ctx = TestContext::new().await;
-    ctx.create_password_user("login@example.com", "password123").await;
+    ctx.create_password_user("login@example.com", "password123")
+        .await;
 
     let pair = ctx
         .auth_svc
         .login_with_password(
-            LoginRequest { email: "login@example.com".into(), password: "password123".into() },
+            LoginRequest {
+                email: "login@example.com".into(),
+                password: "password123".into(),
+            },
             test_meta(),
         )
         .await
@@ -184,19 +189,26 @@ async fn test_login_success() {
     assert!(!pair.access_token.is_empty());
     assert!(!pair.refresh_token.is_empty());
 
-    let claims = ctx.token_svc.validate_access_token(&pair.access_token).unwrap();
+    let claims = ctx
+        .token_svc
+        .validate_access_token(&pair.access_token)
+        .unwrap();
     assert_eq!(claims.email, "login@example.com");
 }
 
 #[tokio::test]
 async fn test_login_wrong_password() {
     let ctx = TestContext::new().await;
-    ctx.create_password_user("wrong@example.com", "correct").await;
+    ctx.create_password_user("wrong@example.com", "correct")
+        .await;
 
     let err = ctx
         .auth_svc
         .login_with_password(
-            LoginRequest { email: "wrong@example.com".into(), password: "incorrect".into() },
+            LoginRequest {
+                email: "wrong@example.com".into(),
+                password: "incorrect".into(),
+            },
             test_meta(),
         )
         .await
@@ -212,7 +224,10 @@ async fn test_login_user_not_found() {
     let err = ctx
         .auth_svc
         .login_with_password(
-            LoginRequest { email: "ghost@example.com".into(), password: "whatever".into() },
+            LoginRequest {
+                email: "ghost@example.com".into(),
+                password: "whatever".into(),
+            },
             test_meta(),
         )
         .await
@@ -224,12 +239,16 @@ async fn test_login_user_not_found() {
 #[tokio::test]
 async fn test_login_pending_user_rejected() {
     let ctx = TestContext::new().await;
-    ctx.create_pending_user("pending@example.com", "password123").await;
+    ctx.create_pending_user("pending@example.com", "password123")
+        .await;
 
     let err = ctx
         .auth_svc
         .login_with_password(
-            LoginRequest { email: "pending@example.com".into(), password: "password123".into() },
+            LoginRequest {
+                email: "pending@example.com".into(),
+                password: "password123".into(),
+            },
             test_meta(),
         )
         .await
@@ -242,15 +261,21 @@ async fn test_login_pending_user_rejected() {
 async fn test_login_oauth_user_no_password() {
     let ctx = TestContext::new().await;
     let user = User::new_with_oauth(
-        "oauth@example.com".into(), "OAuth User".into(), None,
-        OAuthProvider::Google, "gid-123".into(),
+        "oauth@example.com".into(),
+        "OAuth User".into(),
+        None,
+        OAuthProvider::Google,
+        "gid-123".into(),
     );
     ctx.user_repo.save(&user).await.unwrap();
 
     let err = ctx
         .auth_svc
         .login_with_password(
-            LoginRequest { email: "oauth@example.com".into(), password: "anything".into() },
+            LoginRequest {
+                email: "oauth@example.com".into(),
+                password: "anything".into(),
+            },
             test_meta(),
         )
         .await
@@ -262,7 +287,9 @@ async fn test_login_oauth_user_no_password() {
 #[tokio::test]
 async fn test_login_includes_effective_scopes() {
     let ctx = TestContext::new().await;
-    let user = ctx.create_password_user("scoped@example.com", "password123").await;
+    let user = ctx
+        .create_password_user("scoped@example.com", "password123")
+        .await;
 
     let role_svc = RoleService::new(ctx.role_repo.clone(), ctx.user_repo.clone());
     let role = role_svc
@@ -273,18 +300,27 @@ async fn test_login_includes_effective_scopes() {
         })
         .await
         .unwrap();
-    role_svc.assign_role_to_user(&role.id, &user.id).await.unwrap();
+    role_svc
+        .assign_role_to_user(&role.id, &user.id)
+        .await
+        .unwrap();
 
     let pair = ctx
         .auth_svc
         .login_with_password(
-            LoginRequest { email: "scoped@example.com".into(), password: "password123".into() },
+            LoginRequest {
+                email: "scoped@example.com".into(),
+                password: "password123".into(),
+            },
             test_meta(),
         )
         .await
         .unwrap();
 
-    let claims = ctx.token_svc.validate_access_token(&pair.access_token).unwrap();
+    let claims = ctx
+        .token_svc
+        .validate_access_token(&pair.access_token)
+        .unwrap();
     assert!(claims.scopes.contains(&"users:read".to_string()));
     assert!(claims.scopes.contains(&"users:write".to_string()));
 }
@@ -301,8 +337,10 @@ async fn test_oauth_creates_new_user() {
         .auth_svc
         .find_or_create_oauth_user(
             OAuthUserInfo {
-                id: "gid-123".into(), email: "new-oauth@example.com".into(),
-                name: "OAuth New".into(), picture: Some("https://pic.jpg".into()),
+                id: "gid-123".into(),
+                email: "new-oauth@example.com".into(),
+                name: "OAuth New".into(),
+                picture: Some("https://pic.jpg".into()),
                 email_verified: true,
             },
             OAuthProvider::Google,
@@ -313,7 +351,12 @@ async fn test_oauth_creates_new_user() {
 
     assert!(!pair.access_token.is_empty());
 
-    let user = ctx.user_repo.get_by_email("new-oauth@example.com").await.unwrap().unwrap();
+    let user = ctx
+        .user_repo
+        .get_by_email("new-oauth@example.com")
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(user.oauth_provider, Some(OAuthProvider::Google));
     assert_eq!(user.oauth_provider_id.as_deref(), Some("gid-123"));
 }
@@ -321,13 +364,17 @@ async fn test_oauth_creates_new_user() {
 #[tokio::test]
 async fn test_oauth_links_to_existing_user() {
     let ctx = TestContext::new().await;
-    ctx.create_password_user("existing@example.com", "password123").await;
+    ctx.create_password_user("existing@example.com", "password123")
+        .await;
 
     ctx.auth_svc
         .find_or_create_oauth_user(
             OAuthUserInfo {
-                id: "gid-456".into(), email: "existing@example.com".into(),
-                name: "Updated".into(), picture: None, email_verified: true,
+                id: "gid-456".into(),
+                email: "existing@example.com".into(),
+                name: "Updated".into(),
+                picture: None,
+                email_verified: true,
             },
             OAuthProvider::Google,
             test_meta(),
@@ -335,7 +382,12 @@ async fn test_oauth_links_to_existing_user() {
         .await
         .unwrap();
 
-    let user = ctx.user_repo.get_by_email("existing@example.com").await.unwrap().unwrap();
+    let user = ctx
+        .user_repo
+        .get_by_email("existing@example.com")
+        .await
+        .unwrap()
+        .unwrap();
     assert!(user.has_password());
     assert!(user.has_oauth());
     assert_eq!(user.oauth_provider, Some(OAuthProvider::Google));
@@ -348,12 +400,20 @@ async fn test_oauth_links_to_existing_user() {
 #[tokio::test]
 async fn test_login_creates_session_with_metadata() {
     let ctx = TestContext::new().await;
-    let user = ctx.create_password_user("sess@example.com", "password123").await;
+    let user = ctx
+        .create_password_user("sess@example.com", "password123")
+        .await;
 
     ctx.auth_svc
         .login_with_password(
-            LoginRequest { email: "sess@example.com".into(), password: "password123".into() },
-            LoginMetadata { ip_address: "192.168.1.1".into(), user_agent: "Mozilla/5.0".into() },
+            LoginRequest {
+                email: "sess@example.com".into(),
+                password: "password123".into(),
+            },
+            LoginMetadata {
+                ip_address: "192.168.1.1".into(),
+                user_agent: "Mozilla/5.0".into(),
+            },
         )
         .await
         .unwrap();
@@ -367,13 +427,18 @@ async fn test_login_creates_session_with_metadata() {
 #[tokio::test]
 async fn test_multiple_logins_create_separate_sessions() {
     let ctx = TestContext::new().await;
-    let user = ctx.create_password_user("multi@example.com", "password123").await;
+    let user = ctx
+        .create_password_user("multi@example.com", "password123")
+        .await;
 
     // Login from 3 different "devices"
     for i in 0..3 {
         ctx.auth_svc
             .login_with_password(
-                LoginRequest { email: "multi@example.com".into(), password: "password123".into() },
+                LoginRequest {
+                    email: "multi@example.com".into(),
+                    password: "password123".into(),
+                },
                 LoginMetadata {
                     ip_address: format!("10.0.0.{i}"),
                     user_agent: format!("Device-{i}"),
@@ -394,16 +459,27 @@ async fn test_oauth_login_creates_session() {
     ctx.auth_svc
         .find_or_create_oauth_user(
             OAuthUserInfo {
-                id: "gid-sess".into(), email: "oauth-sess@example.com".into(),
-                name: "OAuth".into(), picture: None, email_verified: true,
+                id: "gid-sess".into(),
+                email: "oauth-sess@example.com".into(),
+                name: "OAuth".into(),
+                picture: None,
+                email_verified: true,
             },
             OAuthProvider::Google,
-            LoginMetadata { ip_address: "10.0.0.1".into(), user_agent: "OAuthClient".into() },
+            LoginMetadata {
+                ip_address: "10.0.0.1".into(),
+                user_agent: "OAuthClient".into(),
+            },
         )
         .await
         .unwrap();
 
-    let user = ctx.user_repo.get_by_email("oauth-sess@example.com").await.unwrap().unwrap();
+    let user = ctx
+        .user_repo
+        .get_by_email("oauth-sess@example.com")
+        .await
+        .unwrap()
+        .unwrap();
     let sessions = ctx.auth_svc.list_user_sessions(&user.id).await.unwrap();
     assert_eq!(sessions.len(), 1);
     assert_eq!(sessions[0].ip_address, "10.0.0.1");
@@ -416,19 +492,28 @@ async fn test_oauth_login_creates_session() {
 #[tokio::test]
 async fn test_refresh_rotates_within_same_session() {
     let ctx = TestContext::new().await;
-    let user = ctx.create_password_user("rotate@example.com", "password123").await;
+    let user = ctx
+        .create_password_user("rotate@example.com", "password123")
+        .await;
 
     let pair = ctx
         .auth_svc
         .login_with_password(
-            LoginRequest { email: "rotate@example.com".into(), password: "password123".into() },
+            LoginRequest {
+                email: "rotate@example.com".into(),
+                password: "password123".into(),
+            },
             test_meta(),
         )
         .await
         .unwrap();
 
     // Should still be 1 session after refresh
-    let new_pair = ctx.auth_svc.refresh_tokens(&pair.refresh_token).await.unwrap();
+    let new_pair = ctx
+        .auth_svc
+        .refresh_tokens(&pair.refresh_token)
+        .await
+        .unwrap();
 
     let sessions = ctx.auth_svc.list_user_sessions(&user.id).await.unwrap();
     assert_eq!(sessions.len(), 1, "refresh should NOT create a new session");
@@ -436,29 +521,43 @@ async fn test_refresh_rotates_within_same_session() {
     // New tokens are valid
     assert!(!new_pair.access_token.is_empty());
     assert_ne!(new_pair.refresh_token, pair.refresh_token);
-    let claims = ctx.token_svc.validate_access_token(&new_pair.access_token).unwrap();
+    let claims = ctx
+        .token_svc
+        .validate_access_token(&new_pair.access_token)
+        .unwrap();
     assert_eq!(claims.email, "rotate@example.com");
 }
 
 #[tokio::test]
 async fn test_refresh_reuse_rejected_after_rotation() {
     let ctx = TestContext::new().await;
-    ctx.create_password_user("reuse@example.com", "password123").await;
+    ctx.create_password_user("reuse@example.com", "password123")
+        .await;
 
     let pair = ctx
         .auth_svc
         .login_with_password(
-            LoginRequest { email: "reuse@example.com".into(), password: "password123".into() },
+            LoginRequest {
+                email: "reuse@example.com".into(),
+                password: "password123".into(),
+            },
             test_meta(),
         )
         .await
         .unwrap();
 
     // First refresh succeeds
-    ctx.auth_svc.refresh_tokens(&pair.refresh_token).await.unwrap();
+    ctx.auth_svc
+        .refresh_tokens(&pair.refresh_token)
+        .await
+        .unwrap();
 
     // Reuse of old token fails (it was revoked)
-    let err = ctx.auth_svc.refresh_tokens(&pair.refresh_token).await.unwrap_err();
+    let err = ctx
+        .auth_svc
+        .refresh_tokens(&pair.refresh_token)
+        .await
+        .unwrap_err();
     assert_eq!(err.code, "auth.invalid_refresh_token");
 }
 
@@ -466,32 +565,57 @@ async fn test_refresh_reuse_rejected_after_rotation() {
 async fn test_refresh_invalid_token() {
     let ctx = TestContext::new().await;
 
-    let err = ctx.auth_svc.refresh_tokens("garbage-token").await.unwrap_err();
+    let err = ctx
+        .auth_svc
+        .refresh_tokens("garbage-token")
+        .await
+        .unwrap_err();
     assert_eq!(err.code, "auth.invalid_refresh_token");
 }
 
 #[tokio::test]
 async fn test_refresh_chain_stays_in_same_session() {
     let ctx = TestContext::new().await;
-    let user = ctx.create_password_user("chain@example.com", "password123").await;
+    let user = ctx
+        .create_password_user("chain@example.com", "password123")
+        .await;
 
     let pair1 = ctx
         .auth_svc
         .login_with_password(
-            LoginRequest { email: "chain@example.com".into(), password: "password123".into() },
+            LoginRequest {
+                email: "chain@example.com".into(),
+                password: "password123".into(),
+            },
             test_meta(),
         )
         .await
         .unwrap();
 
     // Refresh 3 times in a chain
-    let pair2 = ctx.auth_svc.refresh_tokens(&pair1.refresh_token).await.unwrap();
-    let pair3 = ctx.auth_svc.refresh_tokens(&pair2.refresh_token).await.unwrap();
-    let _pair4 = ctx.auth_svc.refresh_tokens(&pair3.refresh_token).await.unwrap();
+    let pair2 = ctx
+        .auth_svc
+        .refresh_tokens(&pair1.refresh_token)
+        .await
+        .unwrap();
+    let pair3 = ctx
+        .auth_svc
+        .refresh_tokens(&pair2.refresh_token)
+        .await
+        .unwrap();
+    let _pair4 = ctx
+        .auth_svc
+        .refresh_tokens(&pair3.refresh_token)
+        .await
+        .unwrap();
 
     // Still only 1 session
     let sessions = ctx.auth_svc.list_user_sessions(&user.id).await.unwrap();
-    assert_eq!(sessions.len(), 1, "chained refreshes must stay in the same session");
+    assert_eq!(
+        sessions.len(),
+        1,
+        "chained refreshes must stay in the same session"
+    );
 }
 
 // ============================================================================
@@ -501,12 +625,17 @@ async fn test_refresh_chain_stays_in_same_session() {
 #[tokio::test]
 async fn test_logout_revokes_session_and_tokens() {
     let ctx = TestContext::new().await;
-    let user = ctx.create_password_user("lo@example.com", "password123").await;
+    let user = ctx
+        .create_password_user("lo@example.com", "password123")
+        .await;
 
     let pair = ctx
         .auth_svc
         .login_with_password(
-            LoginRequest { email: "lo@example.com".into(), password: "password123".into() },
+            LoginRequest {
+                email: "lo@example.com".into(),
+                password: "password123".into(),
+            },
             test_meta(),
         )
         .await
@@ -515,7 +644,11 @@ async fn test_logout_revokes_session_and_tokens() {
     ctx.auth_svc.logout(&pair.refresh_token).await.unwrap();
 
     // Refresh token is no longer usable
-    let err = ctx.auth_svc.refresh_tokens(&pair.refresh_token).await.unwrap_err();
+    let err = ctx
+        .auth_svc
+        .refresh_tokens(&pair.refresh_token)
+        .await
+        .unwrap_err();
     assert_eq!(err.code, "auth.invalid_refresh_token");
 
     // Session is gone
@@ -526,14 +659,22 @@ async fn test_logout_revokes_session_and_tokens() {
 #[tokio::test]
 async fn test_logout_one_session_keeps_others() {
     let ctx = TestContext::new().await;
-    let user = ctx.create_password_user("partial@example.com", "password123").await;
+    let user = ctx
+        .create_password_user("partial@example.com", "password123")
+        .await;
 
     // Login from two devices
     let pair_phone = ctx
         .auth_svc
         .login_with_password(
-            LoginRequest { email: "partial@example.com".into(), password: "password123".into() },
-            LoginMetadata { ip_address: "1.1.1.1".into(), user_agent: "Phone".into() },
+            LoginRequest {
+                email: "partial@example.com".into(),
+                password: "password123".into(),
+            },
+            LoginMetadata {
+                ip_address: "1.1.1.1".into(),
+                user_agent: "Phone".into(),
+            },
         )
         .await
         .unwrap();
@@ -541,20 +682,39 @@ async fn test_logout_one_session_keeps_others() {
     let pair_laptop = ctx
         .auth_svc
         .login_with_password(
-            LoginRequest { email: "partial@example.com".into(), password: "password123".into() },
-            LoginMetadata { ip_address: "2.2.2.2".into(), user_agent: "Laptop".into() },
+            LoginRequest {
+                email: "partial@example.com".into(),
+                password: "password123".into(),
+            },
+            LoginMetadata {
+                ip_address: "2.2.2.2".into(),
+                user_agent: "Laptop".into(),
+            },
         )
         .await
         .unwrap();
 
     // Logout from phone only
-    ctx.auth_svc.logout(&pair_phone.refresh_token).await.unwrap();
+    ctx.auth_svc
+        .logout(&pair_phone.refresh_token)
+        .await
+        .unwrap();
 
     // Phone token dead
-    assert!(ctx.auth_svc.refresh_tokens(&pair_phone.refresh_token).await.is_err());
+    assert!(
+        ctx.auth_svc
+            .refresh_tokens(&pair_phone.refresh_token)
+            .await
+            .is_err()
+    );
 
     // Laptop token still works
-    assert!(ctx.auth_svc.refresh_tokens(&pair_laptop.refresh_token).await.is_ok());
+    assert!(
+        ctx.auth_svc
+            .refresh_tokens(&pair_laptop.refresh_token)
+            .await
+            .is_ok()
+    );
 
     // Only 1 session remains
     let sessions = ctx.auth_svc.list_user_sessions(&user.id).await.unwrap();
@@ -569,13 +729,21 @@ async fn test_logout_one_session_keeps_others() {
 #[tokio::test]
 async fn test_logout_all_revokes_all_sessions_and_tokens() {
     let ctx = TestContext::new().await;
-    let user = ctx.create_password_user("allout@example.com", "password123").await;
+    let user = ctx
+        .create_password_user("allout@example.com", "password123")
+        .await;
 
     let pair1 = ctx
         .auth_svc
         .login_with_password(
-            LoginRequest { email: "allout@example.com".into(), password: "password123".into() },
-            LoginMetadata { ip_address: "1.1.1.1".into(), user_agent: "Phone".into() },
+            LoginRequest {
+                email: "allout@example.com".into(),
+                password: "password123".into(),
+            },
+            LoginMetadata {
+                ip_address: "1.1.1.1".into(),
+                user_agent: "Phone".into(),
+            },
         )
         .await
         .unwrap();
@@ -583,8 +751,14 @@ async fn test_logout_all_revokes_all_sessions_and_tokens() {
     let pair2 = ctx
         .auth_svc
         .login_with_password(
-            LoginRequest { email: "allout@example.com".into(), password: "password123".into() },
-            LoginMetadata { ip_address: "2.2.2.2".into(), user_agent: "Laptop".into() },
+            LoginRequest {
+                email: "allout@example.com".into(),
+                password: "password123".into(),
+            },
+            LoginMetadata {
+                ip_address: "2.2.2.2".into(),
+                user_agent: "Laptop".into(),
+            },
         )
         .await
         .unwrap();
@@ -592,8 +766,18 @@ async fn test_logout_all_revokes_all_sessions_and_tokens() {
     ctx.auth_svc.logout_all(&user.id).await.unwrap();
 
     // Both tokens dead
-    assert!(ctx.auth_svc.refresh_tokens(&pair1.refresh_token).await.is_err());
-    assert!(ctx.auth_svc.refresh_tokens(&pair2.refresh_token).await.is_err());
+    assert!(
+        ctx.auth_svc
+            .refresh_tokens(&pair1.refresh_token)
+            .await
+            .is_err()
+    );
+    assert!(
+        ctx.auth_svc
+            .refresh_tokens(&pair2.refresh_token)
+            .await
+            .is_err()
+    );
 
     // All sessions gone
     let sessions = ctx.auth_svc.list_user_sessions(&user.id).await.unwrap();
@@ -607,12 +791,17 @@ async fn test_logout_all_revokes_all_sessions_and_tokens() {
 #[tokio::test]
 async fn test_revoke_session_by_id_cascades_tokens() {
     let ctx = TestContext::new().await;
-    let user = ctx.create_password_user("revoke@example.com", "password123").await;
+    let user = ctx
+        .create_password_user("revoke@example.com", "password123")
+        .await;
 
     let pair = ctx
         .auth_svc
         .login_with_password(
-            LoginRequest { email: "revoke@example.com".into(), password: "password123".into() },
+            LoginRequest {
+                email: "revoke@example.com".into(),
+                password: "password123".into(),
+            },
             test_meta(),
         )
         .await
@@ -629,20 +818,32 @@ async fn test_revoke_session_by_id_cascades_tokens() {
     assert_eq!(sessions.len(), 0);
 
     // Refresh token for that session is dead
-    let err = ctx.auth_svc.refresh_tokens(&pair.refresh_token).await.unwrap_err();
+    let err = ctx
+        .auth_svc
+        .refresh_tokens(&pair.refresh_token)
+        .await
+        .unwrap_err();
     assert_eq!(err.code, "auth.invalid_refresh_token");
 }
 
 #[tokio::test]
 async fn test_revoke_session_by_id_keeps_other_sessions() {
     let ctx = TestContext::new().await;
-    let user = ctx.create_password_user("revokeone@example.com", "password123").await;
+    let user = ctx
+        .create_password_user("revokeone@example.com", "password123")
+        .await;
 
     let _pair1 = ctx
         .auth_svc
         .login_with_password(
-            LoginRequest { email: "revokeone@example.com".into(), password: "password123".into() },
-            LoginMetadata { ip_address: "1.1.1.1".into(), user_agent: "Phone".into() },
+            LoginRequest {
+                email: "revokeone@example.com".into(),
+                password: "password123".into(),
+            },
+            LoginMetadata {
+                ip_address: "1.1.1.1".into(),
+                user_agent: "Phone".into(),
+            },
         )
         .await
         .unwrap();
@@ -650,8 +851,14 @@ async fn test_revoke_session_by_id_keeps_other_sessions() {
     let pair2 = ctx
         .auth_svc
         .login_with_password(
-            LoginRequest { email: "revokeone@example.com".into(), password: "password123".into() },
-            LoginMetadata { ip_address: "2.2.2.2".into(), user_agent: "Laptop".into() },
+            LoginRequest {
+                email: "revokeone@example.com".into(),
+                password: "password123".into(),
+            },
+            LoginMetadata {
+                ip_address: "2.2.2.2".into(),
+                user_agent: "Laptop".into(),
+            },
         )
         .await
         .unwrap();
@@ -661,7 +868,10 @@ async fn test_revoke_session_by_id_keeps_other_sessions() {
 
     // Find the Phone session and revoke it
     let phone_session = sessions.iter().find(|s| s.user_agent == "Phone").unwrap();
-    ctx.auth_svc.revoke_session(&phone_session.id).await.unwrap();
+    ctx.auth_svc
+        .revoke_session(&phone_session.id)
+        .await
+        .unwrap();
 
     // Only Laptop remains
     let sessions = ctx.auth_svc.list_user_sessions(&user.id).await.unwrap();
@@ -669,7 +879,12 @@ async fn test_revoke_session_by_id_keeps_other_sessions() {
     assert_eq!(sessions[0].user_agent, "Laptop");
 
     // Laptop token still works
-    assert!(ctx.auth_svc.refresh_tokens(&pair2.refresh_token).await.is_ok());
+    assert!(
+        ctx.auth_svc
+            .refresh_tokens(&pair2.refresh_token)
+            .await
+            .is_ok()
+    );
 }
 
 // ============================================================================
@@ -679,12 +894,17 @@ async fn test_revoke_session_by_id_keeps_other_sessions() {
 #[tokio::test]
 async fn test_refresh_updates_session_last_activity() {
     let ctx = TestContext::new().await;
-    let user = ctx.create_password_user("activity@example.com", "password123").await;
+    let user = ctx
+        .create_password_user("activity@example.com", "password123")
+        .await;
 
     let pair = ctx
         .auth_svc
         .login_with_password(
-            LoginRequest { email: "activity@example.com".into(), password: "password123".into() },
+            LoginRequest {
+                email: "activity@example.com".into(),
+                password: "password123".into(),
+            },
             test_meta(),
         )
         .await
@@ -696,10 +916,16 @@ async fn test_refresh_updates_session_last_activity() {
     // Small delay to ensure timestamp difference
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    ctx.auth_svc.refresh_tokens(&pair.refresh_token).await.unwrap();
+    ctx.auth_svc
+        .refresh_tokens(&pair.refresh_token)
+        .await
+        .unwrap();
 
     let sessions_after = ctx.auth_svc.list_user_sessions(&user.id).await.unwrap();
     let activity_after = sessions_after[0].last_activity;
 
-    assert!(activity_after >= activity_before, "last_activity should be updated on refresh");
+    assert!(
+        activity_after >= activity_before,
+        "last_activity should be updated on refresh"
+    );
 }

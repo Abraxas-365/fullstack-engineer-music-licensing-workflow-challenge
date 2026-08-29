@@ -7,7 +7,9 @@ use crate::kernel::UserId;
 
 use super::config::AuthConfig;
 use super::error::AuthError;
-use super::model::{LoginMetadata, LoginRequest, OAuthUserInfo, RefreshToken, TokenClaims, TokenPair, UserSession};
+use super::model::{
+    LoginMetadata, LoginRequest, OAuthUserInfo, RefreshToken, TokenClaims, TokenPair, UserSession,
+};
 use super::port::{SessionRepository, TokenRepository, TokenService};
 
 pub struct AuthService {
@@ -45,7 +47,11 @@ impl AuthService {
     // Login
     // ========================================================================
 
-    pub async fn login_with_password(&self, req: LoginRequest, meta: LoginMetadata) -> Result<TokenPair, AppError> {
+    pub async fn login_with_password(
+        &self,
+        req: LoginRequest,
+        meta: LoginMetadata,
+    ) -> Result<TokenPair, AppError> {
         let user = self
             .user_repo
             .get_by_email(&req.email)
@@ -138,7 +144,9 @@ impl AuthService {
         self.token_repo.revoke_refresh_token(refresh_token).await?;
 
         // Update session activity
-        self.session_repo.update_activity(&stored.session_id).await?;
+        self.session_repo
+            .update_activity(&stored.session_id)
+            .await?;
 
         // Get user and generate new token pair within the same session
         let user = self
@@ -162,7 +170,9 @@ impl AuthService {
     pub async fn logout(&self, refresh_token: &str) -> Result<(), AppError> {
         // Find the token to get its session_id
         if let Some(stored) = self.token_repo.get_refresh_token(refresh_token).await? {
-            self.token_repo.revoke_by_session(&stored.session_id).await?;
+            self.token_repo
+                .revoke_by_session(&stored.session_id)
+                .await?;
             self.session_repo.revoke(&stored.session_id).await?;
         }
         Ok(())
@@ -214,7 +224,11 @@ impl AuthService {
     }
 
     /// Generates access + refresh tokens linked to an existing session
-    async fn generate_token_pair(&self, user: &User, session_id: &str) -> Result<TokenPair, AppError> {
+    async fn generate_token_pair(
+        &self,
+        user: &User,
+        session_id: &str,
+    ) -> Result<TokenPair, AppError> {
         let scopes = self.resolve_effective_scopes(&user.id).await?;
 
         let claims = TokenClaims {
@@ -275,34 +289,63 @@ mod tests {
         users: Mutex<Vec<User>>,
     }
     impl MockUserRepo {
-        fn new() -> Self { Self { users: Mutex::new(Vec::new()) } }
-        async fn add(&self, user: User) { self.users.lock().await.push(user); }
+        fn new() -> Self {
+            Self {
+                users: Mutex::new(Vec::new()),
+            }
+        }
+        async fn add(&self, user: User) {
+            self.users.lock().await.push(user);
+        }
     }
     #[async_trait::async_trait]
     impl UserRepository for MockUserRepo {
         async fn get_by_id(&self, id: &UserId) -> Result<Option<User>, AppError> {
-            Ok(self.users.lock().await.iter().find(|u| u.id == *id).cloned())
+            Ok(self
+                .users
+                .lock()
+                .await
+                .iter()
+                .find(|u| u.id == *id)
+                .cloned())
         }
         async fn get_by_email(&self, email: &str) -> Result<Option<User>, AppError> {
-            Ok(self.users.lock().await.iter().find(|u| u.email == email).cloned())
+            Ok(self
+                .users
+                .lock()
+                .await
+                .iter()
+                .find(|u| u.email == email)
+                .cloned())
         }
-        async fn find(&self, _opts: &PaginationOptions, _f: &UserFilter) -> Result<Paginated<User>, AppError> {
+        async fn find(
+            &self,
+            _opts: &PaginationOptions,
+            _f: &UserFilter,
+        ) -> Result<Paginated<User>, AppError> {
             Ok(Paginated::new(vec![], 1, 10, 0))
         }
         async fn save(&self, user: &User) -> Result<(), AppError> {
-            self.users.lock().await.push(user.clone()); Ok(())
+            self.users.lock().await.push(user.clone());
+            Ok(())
         }
         async fn update(&self, user: &User) -> Result<(), AppError> {
             let mut users = self.users.lock().await;
-            if let Some(u) = users.iter_mut().find(|u| u.id == user.id) { *u = user.clone(); }
+            if let Some(u) = users.iter_mut().find(|u| u.id == user.id) {
+                *u = user.clone();
+            }
             Ok(())
         }
-        async fn delete(&self, _id: &UserId) -> Result<(), AppError> { Ok(()) }
+        async fn delete(&self, _id: &UserId) -> Result<(), AppError> {
+            Ok(())
+        }
     }
 
     struct MockPasswordSvc;
     impl PasswordService for MockPasswordSvc {
-        fn hash_password(&self, pw: &str) -> Result<String, AppError> { Ok(format!("hashed_{pw}")) }
+        fn hash_password(&self, pw: &str) -> Result<String, AppError> {
+            Ok(format!("hashed_{pw}"))
+        }
         fn verify_password(&self, pw: &str, hash: &str) -> Result<bool, AppError> {
             Ok(hash == format!("hashed_{pw}"))
         }
@@ -334,29 +377,46 @@ mod tests {
         tokens: Mutex<Vec<RefreshToken>>,
     }
     impl MockTokenRepo {
-        fn new() -> Self { Self { tokens: Mutex::new(Vec::new()) } }
+        fn new() -> Self {
+            Self {
+                tokens: Mutex::new(Vec::new()),
+            }
+        }
     }
     #[async_trait::async_trait]
     impl TokenRepository for MockTokenRepo {
         async fn save_refresh_token(&self, token: &RefreshToken) -> Result<(), AppError> {
-            self.tokens.lock().await.push(token.clone()); Ok(())
+            self.tokens.lock().await.push(token.clone());
+            Ok(())
         }
         async fn get_refresh_token(&self, token: &str) -> Result<Option<RefreshToken>, AppError> {
-            Ok(self.tokens.lock().await.iter().find(|t| t.token == token).cloned())
+            Ok(self
+                .tokens
+                .lock()
+                .await
+                .iter()
+                .find(|t| t.token == token)
+                .cloned())
         }
         async fn revoke_refresh_token(&self, token: &str) -> Result<(), AppError> {
             let mut tokens = self.tokens.lock().await;
-            if let Some(t) = tokens.iter_mut().find(|t| t.token == token) { t.is_revoked = true; }
+            if let Some(t) = tokens.iter_mut().find(|t| t.token == token) {
+                t.is_revoked = true;
+            }
             Ok(())
         }
         async fn revoke_all_for_user(&self, user_id: &UserId) -> Result<(), AppError> {
             let mut tokens = self.tokens.lock().await;
-            for t in tokens.iter_mut().filter(|t| t.user_id == *user_id) { t.is_revoked = true; }
+            for t in tokens.iter_mut().filter(|t| t.user_id == *user_id) {
+                t.is_revoked = true;
+            }
             Ok(())
         }
         async fn revoke_by_session(&self, session_id: &str) -> Result<(), AppError> {
             let mut tokens = self.tokens.lock().await;
-            for t in tokens.iter_mut().filter(|t| t.session_id == session_id) { t.is_revoked = true; }
+            for t in tokens.iter_mut().filter(|t| t.session_id == session_id) {
+                t.is_revoked = true;
+            }
             Ok(())
         }
     }
@@ -365,40 +425,80 @@ mod tests {
         sessions: Mutex<Vec<UserSession>>,
     }
     impl MockSessionRepo {
-        fn new() -> Self { Self { sessions: Mutex::new(Vec::new()) } }
+        fn new() -> Self {
+            Self {
+                sessions: Mutex::new(Vec::new()),
+            }
+        }
     }
     #[async_trait::async_trait]
     impl SessionRepository for MockSessionRepo {
         async fn save(&self, session: &UserSession) -> Result<(), AppError> {
-            self.sessions.lock().await.push(session.clone()); Ok(())
+            self.sessions.lock().await.push(session.clone());
+            Ok(())
         }
         async fn get_by_id(&self, id: &str) -> Result<Option<UserSession>, AppError> {
-            Ok(self.sessions.lock().await.iter().find(|s| s.id == id).cloned())
+            Ok(self
+                .sessions
+                .lock()
+                .await
+                .iter()
+                .find(|s| s.id == id)
+                .cloned())
         }
         async fn list_by_user(&self, user_id: &UserId) -> Result<Vec<UserSession>, AppError> {
-            Ok(self.sessions.lock().await.iter().filter(|s| s.user_id == *user_id).cloned().collect())
+            Ok(self
+                .sessions
+                .lock()
+                .await
+                .iter()
+                .filter(|s| s.user_id == *user_id)
+                .cloned()
+                .collect())
         }
-        async fn update_activity(&self, _session_id: &str) -> Result<(), AppError> { Ok(()) }
+        async fn update_activity(&self, _session_id: &str) -> Result<(), AppError> {
+            Ok(())
+        }
         async fn revoke(&self, session_id: &str) -> Result<(), AppError> {
-            self.sessions.lock().await.retain(|s| s.id != session_id); Ok(())
+            self.sessions.lock().await.retain(|s| s.id != session_id);
+            Ok(())
         }
         async fn revoke_all_for_user(&self, user_id: &UserId) -> Result<(), AppError> {
-            self.sessions.lock().await.retain(|s| s.user_id != *user_id); Ok(())
+            self.sessions.lock().await.retain(|s| s.user_id != *user_id);
+            Ok(())
         }
-        async fn clean_expired(&self) -> Result<(), AppError> { Ok(()) }
+        async fn clean_expired(&self) -> Result<(), AppError> {
+            Ok(())
+        }
     }
 
     struct MockRoleRepo;
     #[async_trait::async_trait]
     impl RoleRepository for MockRoleRepo {
-        async fn save(&self, _role: &Role) -> Result<(), AppError> { Ok(()) }
-        async fn get_by_id(&self, _id: &RoleId) -> Result<Option<Role>, AppError> { Ok(None) }
-        async fn get_by_name(&self, _name: &str) -> Result<Option<Role>, AppError> { Ok(None) }
-        async fn list_all(&self) -> Result<Vec<Role>, AppError> { Ok(vec![]) }
-        async fn delete(&self, _id: &RoleId) -> Result<(), AppError> { Ok(()) }
-        async fn assign_to_user(&self, _uid: &UserId, _rid: &RoleId) -> Result<(), AppError> { Ok(()) }
-        async fn unassign_from_user(&self, _uid: &UserId, _rid: &RoleId) -> Result<(), AppError> { Ok(()) }
-        async fn list_by_user(&self, _uid: &UserId) -> Result<Vec<Role>, AppError> { Ok(vec![]) }
+        async fn save(&self, _role: &Role) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn get_by_id(&self, _id: &RoleId) -> Result<Option<Role>, AppError> {
+            Ok(None)
+        }
+        async fn get_by_name(&self, _name: &str) -> Result<Option<Role>, AppError> {
+            Ok(None)
+        }
+        async fn list_all(&self) -> Result<Vec<Role>, AppError> {
+            Ok(vec![])
+        }
+        async fn delete(&self, _id: &RoleId) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn assign_to_user(&self, _uid: &UserId, _rid: &RoleId) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn unassign_from_user(&self, _uid: &UserId, _rid: &RoleId) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn list_by_user(&self, _uid: &UserId) -> Result<Vec<Role>, AppError> {
+            Ok(vec![])
+        }
     }
 
     fn test_config() -> AuthConfig {
@@ -414,7 +514,8 @@ mod tests {
     }
 
     fn make_active_user(email: &str) -> User {
-        let mut user = User::new_with_password(email.into(), "Test".into(), "hashed_password123".into());
+        let mut user =
+            User::new_with_password(email.into(), "Test".into(), "hashed_password123".into());
         user.status = crate::iam::user::UserStatus::Active;
         user.email_verified = true;
         user
@@ -437,11 +538,17 @@ mod tests {
     }
 
     fn login_req(email: &str, password: &str) -> LoginRequest {
-        LoginRequest { email: email.into(), password: password.into() }
+        LoginRequest {
+            email: email.into(),
+            password: password.into(),
+        }
     }
 
     fn meta() -> LoginMetadata {
-        LoginMetadata { ip_address: "127.0.0.1".into(), user_agent: "test".into() }
+        LoginMetadata {
+            ip_address: "127.0.0.1".into(),
+            user_agent: "test".into(),
+        }
     }
 
     // ========================================================================
@@ -454,7 +561,10 @@ mod tests {
         user_repo.add(make_active_user("a@b.com")).await;
         let svc = make_svc(user_repo, MockTokenRepo::new(), MockSessionRepo::new());
 
-        let pair = svc.login_with_password(login_req("a@b.com", "password123"), meta()).await.unwrap();
+        let pair = svc
+            .login_with_password(login_req("a@b.com", "password123"), meta())
+            .await
+            .unwrap();
         assert!(pair.access_token.starts_with("access_"));
         assert!(pair.refresh_token.starts_with("refresh_"));
         assert_eq!(pair.token_type, "Bearer");
@@ -462,8 +572,15 @@ mod tests {
 
     #[tokio::test]
     async fn login_user_not_found() {
-        let svc = make_svc(MockUserRepo::new(), MockTokenRepo::new(), MockSessionRepo::new());
-        let err = svc.login_with_password(login_req("nope@x.com", "pw"), meta()).await.unwrap_err();
+        let svc = make_svc(
+            MockUserRepo::new(),
+            MockTokenRepo::new(),
+            MockSessionRepo::new(),
+        );
+        let err = svc
+            .login_with_password(login_req("nope@x.com", "pw"), meta())
+            .await
+            .unwrap_err();
         assert_eq!(err.code, "auth.invalid_credentials");
     }
 
@@ -473,7 +590,10 @@ mod tests {
         user_repo.add(make_active_user("a@b.com")).await;
         let svc = make_svc(user_repo, MockTokenRepo::new(), MockSessionRepo::new());
 
-        let err = svc.login_with_password(login_req("a@b.com", "wrong"), meta()).await.unwrap_err();
+        let err = svc
+            .login_with_password(login_req("a@b.com", "wrong"), meta())
+            .await
+            .unwrap_err();
         assert_eq!(err.code, "auth.invalid_credentials");
     }
 
@@ -481,13 +601,19 @@ mod tests {
     async fn login_oauth_only_user() {
         let user_repo = MockUserRepo::new();
         let user = User::new_with_oauth(
-            "oauth@b.com".into(), "OAuth".into(), None,
-            OAuthProvider::Google, "gid123".into(),
+            "oauth@b.com".into(),
+            "OAuth".into(),
+            None,
+            OAuthProvider::Google,
+            "gid123".into(),
         );
         user_repo.add(user).await;
         let svc = make_svc(user_repo, MockTokenRepo::new(), MockSessionRepo::new());
 
-        let err = svc.login_with_password(login_req("oauth@b.com", "any"), meta()).await.unwrap_err();
+        let err = svc
+            .login_with_password(login_req("oauth@b.com", "any"), meta())
+            .await
+            .unwrap_err();
         assert_eq!(err.code, "auth.invalid_credentials");
     }
 
@@ -495,11 +621,15 @@ mod tests {
     async fn login_account_disabled() {
         let user_repo = MockUserRepo::new();
         // Pending user (not active)
-        let user = User::new_with_password("a@b.com".into(), "Test".into(), "hashed_password123".into());
+        let user =
+            User::new_with_password("a@b.com".into(), "Test".into(), "hashed_password123".into());
         user_repo.add(user).await;
         let svc = make_svc(user_repo, MockTokenRepo::new(), MockSessionRepo::new());
 
-        let err = svc.login_with_password(login_req("a@b.com", "password123"), meta()).await.unwrap_err();
+        let err = svc
+            .login_with_password(login_req("a@b.com", "password123"), meta())
+            .await
+            .unwrap_err();
         assert_eq!(err.code, "auth.account_disabled");
     }
 
@@ -518,7 +648,10 @@ mod tests {
 
         let svc = make_svc(user_repo, token_repo, session_repo);
         // Login to get initial tokens
-        let pair = svc.login_with_password(login_req("a@b.com", "password123"), meta()).await.unwrap();
+        let pair = svc
+            .login_with_password(login_req("a@b.com", "password123"), meta())
+            .await
+            .unwrap();
 
         // Refresh
         let new_pair = svc.refresh_tokens(&pair.refresh_token).await.unwrap();
@@ -528,7 +661,11 @@ mod tests {
 
     #[tokio::test]
     async fn refresh_invalid_token() {
-        let svc = make_svc(MockUserRepo::new(), MockTokenRepo::new(), MockSessionRepo::new());
+        let svc = make_svc(
+            MockUserRepo::new(),
+            MockTokenRepo::new(),
+            MockSessionRepo::new(),
+        );
         let err = svc.refresh_tokens("garbage_token").await.unwrap_err();
         assert_eq!(err.code, "auth.invalid_refresh_token");
     }
@@ -556,7 +693,10 @@ mod tests {
         let session_repo = MockSessionRepo::new();
         let svc = make_svc(user_repo, token_repo, session_repo);
 
-        let pair = svc.login_with_password(login_req("a@b.com", "password123"), meta()).await.unwrap();
+        let pair = svc
+            .login_with_password(login_req("a@b.com", "password123"), meta())
+            .await
+            .unwrap();
         // Refresh once (revokes old)
         svc.refresh_tokens(&pair.refresh_token).await.unwrap();
         // Try to use the old token again
@@ -574,13 +714,20 @@ mod tests {
         user_repo.add(make_active_user("a@b.com")).await;
         let svc = make_svc(user_repo, MockTokenRepo::new(), MockSessionRepo::new());
 
-        let pair = svc.login_with_password(login_req("a@b.com", "password123"), meta()).await.unwrap();
+        let pair = svc
+            .login_with_password(login_req("a@b.com", "password123"), meta())
+            .await
+            .unwrap();
         svc.logout(&pair.refresh_token).await.unwrap();
     }
 
     #[tokio::test]
     async fn logout_unknown_token() {
-        let svc = make_svc(MockUserRepo::new(), MockTokenRepo::new(), MockSessionRepo::new());
+        let svc = make_svc(
+            MockUserRepo::new(),
+            MockTokenRepo::new(),
+            MockSessionRepo::new(),
+        );
         // Should not error — idempotent
         svc.logout("nonexistent").await.unwrap();
     }
@@ -594,8 +741,12 @@ mod tests {
         let svc = make_svc(user_repo, MockTokenRepo::new(), MockSessionRepo::new());
 
         // Create two sessions
-        svc.login_with_password(login_req("a@b.com", "password123"), meta()).await.unwrap();
-        svc.login_with_password(login_req("a@b.com", "password123"), meta()).await.unwrap();
+        svc.login_with_password(login_req("a@b.com", "password123"), meta())
+            .await
+            .unwrap();
+        svc.login_with_password(login_req("a@b.com", "password123"), meta())
+            .await
+            .unwrap();
 
         svc.logout_all(&user_id).await.unwrap();
         let sessions = svc.list_user_sessions(&user_id).await.unwrap();
@@ -614,8 +765,12 @@ mod tests {
         user_repo.add(user).await;
         let svc = make_svc(user_repo, MockTokenRepo::new(), MockSessionRepo::new());
 
-        svc.login_with_password(login_req("a@b.com", "password123"), meta()).await.unwrap();
-        svc.login_with_password(login_req("a@b.com", "password123"), meta()).await.unwrap();
+        svc.login_with_password(login_req("a@b.com", "password123"), meta())
+            .await
+            .unwrap();
+        svc.login_with_password(login_req("a@b.com", "password123"), meta())
+            .await
+            .unwrap();
 
         let sessions = svc.list_user_sessions(&user_id).await.unwrap();
         assert_eq!(sessions.len(), 2);
@@ -629,7 +784,9 @@ mod tests {
         user_repo.add(user).await;
         let svc = make_svc(user_repo, MockTokenRepo::new(), MockSessionRepo::new());
 
-        svc.login_with_password(login_req("a@b.com", "password123"), meta()).await.unwrap();
+        svc.login_with_password(login_req("a@b.com", "password123"), meta())
+            .await
+            .unwrap();
         let sessions = svc.list_user_sessions(&user_id).await.unwrap();
         assert_eq!(sessions.len(), 1);
 

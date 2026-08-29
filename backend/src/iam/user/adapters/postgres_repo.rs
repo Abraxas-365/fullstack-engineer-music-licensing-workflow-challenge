@@ -20,21 +20,19 @@ const USER_COLUMNS: &str = "id, email, name, password_hash, picture, oauth_provi
 #[async_trait::async_trait]
 impl UserRepository for PostgresUserRepository {
     async fn get_by_id(&self, id: &UserId) -> Result<Option<User>, AppError> {
-        let row = sqlx::query(
-            &format!("SELECT {USER_COLUMNS} FROM users WHERE id = $1")
-        )
-        .bind(id.as_str())
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| AppError::internal(format!("Database error: {e}")))?;
+        let row = sqlx::query(&format!("SELECT {USER_COLUMNS} FROM users WHERE id = $1"))
+            .bind(id.as_str())
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| AppError::internal(format!("Database error: {e}")))?;
 
         row.as_ref().map(user_from_row).transpose()
     }
 
     async fn get_by_email(&self, email: &str) -> Result<Option<User>, AppError> {
-        let row = sqlx::query(
-            &format!("SELECT {USER_COLUMNS} FROM users WHERE email = $1")
-        )
+        let row = sqlx::query(&format!(
+            "SELECT {USER_COLUMNS} FROM users WHERE email = $1"
+        ))
         .bind(email)
         .fetch_optional(&self.pool)
         .await
@@ -49,7 +47,10 @@ impl UserRepository for PostgresUserRepository {
         filter: &UserFilter,
     ) -> Result<Paginated<User>, AppError> {
         let search_pattern = filter.search.as_ref().map(|s| format!("%{s}%"));
-        let status = filter.status.as_ref().map(|s| format!("{s:?}").to_uppercase());
+        let status = filter
+            .status
+            .as_ref()
+            .map(|s| format!("{s:?}").to_uppercase());
 
         let total: i64 = sqlx::query_scalar(
             r#"
@@ -65,9 +66,8 @@ impl UserRepository for PostgresUserRepository {
         .await
         .map_err(|e| AppError::internal(format!("Database error: {e}")))?;
 
-        let rows = sqlx::query(
-            &format!(
-                r#"
+        let rows = sqlx::query(&format!(
+            r#"
                 SELECT {USER_COLUMNS}
                 FROM users
                 WHERE ($1::text IS NULL OR (name ILIKE $1 OR email ILIKE $1))
@@ -75,8 +75,7 @@ impl UserRepository for PostgresUserRepository {
                 ORDER BY created_at DESC
                 LIMIT $3 OFFSET $4
                 "#
-            ),
-        )
+        ))
         .bind(&search_pattern)
         .bind(&status)
         .bind(opts.limit())
@@ -91,7 +90,10 @@ impl UserRepository for PostgresUserRepository {
 
     async fn save(&self, user: &User) -> Result<(), AppError> {
         let status = format!("{:?}", user.status).to_uppercase();
-        let oauth_provider = user.oauth_provider.as_ref().map(|p| format!("{p:?}").to_uppercase());
+        let oauth_provider = user
+            .oauth_provider
+            .as_ref()
+            .map(|p| format!("{p:?}").to_uppercase());
         sqlx::query(
             r#"
             INSERT INTO users (id, email, name, password_hash, picture, oauth_provider, oauth_provider_id, status, email_verified, last_login_at, created_at, updated_at)
@@ -119,7 +121,10 @@ impl UserRepository for PostgresUserRepository {
 
     async fn update(&self, user: &User) -> Result<(), AppError> {
         let status = format!("{:?}", user.status).to_uppercase();
-        let oauth_provider = user.oauth_provider.as_ref().map(|p| format!("{p:?}").to_uppercase());
+        let oauth_provider = user
+            .oauth_provider
+            .as_ref()
+            .map(|p| format!("{p:?}").to_uppercase());
         sqlx::query(
             r#"
             UPDATE users
@@ -156,7 +161,6 @@ impl UserRepository for PostgresUserRepository {
 
         Ok(())
     }
-
 }
 
 // ============================================================================
@@ -189,20 +193,20 @@ fn user_from_row(row: &sqlx::postgres::PgRow) -> Result<User, AppError> {
         picture: row
             .try_get("picture")
             .map_err(|e| AppError::internal(format!("Failed to read column 'picture': {e}")))?,
-        password_hash: row
-            .try_get("password_hash")
-            .map_err(|e| AppError::internal(format!("Failed to read column 'password_hash': {e}")))?,
+        password_hash: row.try_get("password_hash").map_err(|e| {
+            AppError::internal(format!("Failed to read column 'password_hash': {e}"))
+        })?,
         oauth_provider,
-        oauth_provider_id: row
-            .try_get("oauth_provider_id")
-            .map_err(|e| AppError::internal(format!("Failed to read column 'oauth_provider_id': {e}")))?,
+        oauth_provider_id: row.try_get("oauth_provider_id").map_err(|e| {
+            AppError::internal(format!("Failed to read column 'oauth_provider_id': {e}"))
+        })?,
         status,
-        email_verified: row
-            .try_get("email_verified")
-            .map_err(|e| AppError::internal(format!("Failed to read column 'email_verified': {e}")))?,
-        last_login_at: row
-            .try_get("last_login_at")
-            .map_err(|e| AppError::internal(format!("Failed to read column 'last_login_at': {e}")))?,
+        email_verified: row.try_get("email_verified").map_err(|e| {
+            AppError::internal(format!("Failed to read column 'email_verified': {e}"))
+        })?,
+        last_login_at: row.try_get("last_login_at").map_err(|e| {
+            AppError::internal(format!("Failed to read column 'last_login_at': {e}"))
+        })?,
         created_at: row
             .try_get("created_at")
             .map_err(|e| AppError::internal(format!("Failed to read column 'created_at': {e}")))?,

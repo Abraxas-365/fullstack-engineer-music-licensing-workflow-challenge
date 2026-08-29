@@ -61,12 +61,7 @@ impl SongService {
             }
         }
 
-        let mut song = Song::new(
-            req.title,
-            req.artist_id,
-            req.label_id,
-            req.duration_seconds,
-        );
+        let mut song = Song::new(req.title, req.artist_id, req.label_id, req.duration_seconds);
         song.album = req.album;
         song.genre = req.genre;
         song.isrc = req.isrc;
@@ -90,11 +85,7 @@ impl SongService {
         self.song_repo.find(opts, filter).await
     }
 
-    pub async fn update_song(
-        &self,
-        id: &SongId,
-        req: UpdateSongRequest,
-    ) -> Result<Song, AppError> {
+    pub async fn update_song(&self, id: &SongId, req: UpdateSongRequest) -> Result<Song, AppError> {
         req.validate()?;
 
         let mut song = self.get_song(id).await?;
@@ -137,8 +128,8 @@ impl SongService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::iam::user::{User, UserRepository};
     use crate::iam::user::model::UserFilter;
+    use crate::iam::user::{User, UserRepository};
     use crate::label::{Label, LabelMember};
     use tokio::sync::Mutex;
 
@@ -150,37 +141,73 @@ mod tests {
         songs: Mutex<Vec<Song>>,
     }
     impl MockSongRepo {
-        fn new() -> Self { Self { songs: Mutex::new(Vec::new()) } }
+        fn new() -> Self {
+            Self {
+                songs: Mutex::new(Vec::new()),
+            }
+        }
     }
     #[async_trait::async_trait]
     impl SongRepository for MockSongRepo {
         async fn save(&self, song: &Song) -> Result<(), AppError> {
-            self.songs.lock().await.push(song.clone()); Ok(())
+            self.songs.lock().await.push(song.clone());
+            Ok(())
         }
         async fn get_by_id(&self, id: &SongId) -> Result<Option<Song>, AppError> {
-            Ok(self.songs.lock().await.iter().find(|s| s.id == *id).cloned())
+            Ok(self
+                .songs
+                .lock()
+                .await
+                .iter()
+                .find(|s| s.id == *id)
+                .cloned())
         }
-        async fn find(&self, opts: &PaginationOptions, _filter: &SongFilter) -> Result<Paginated<Song>, AppError> {
+        async fn find(
+            &self,
+            opts: &PaginationOptions,
+            _filter: &SongFilter,
+        ) -> Result<Paginated<Song>, AppError> {
             let songs = self.songs.lock().await;
             let total = songs.len() as i64;
             let start = opts.offset() as usize;
-            let items: Vec<Song> = songs.iter().skip(start).take(opts.limit() as usize).cloned().collect();
+            let items: Vec<Song> = songs
+                .iter()
+                .skip(start)
+                .take(opts.limit() as usize)
+                .cloned()
+                .collect();
             Ok(Paginated::new(items, opts.page, opts.page_size, total))
         }
         async fn update(&self, song: &Song) -> Result<(), AppError> {
             let mut songs = self.songs.lock().await;
-            if let Some(s) = songs.iter_mut().find(|s| s.id == song.id) { *s = song.clone(); }
+            if let Some(s) = songs.iter_mut().find(|s| s.id == song.id) {
+                *s = song.clone();
+            }
             Ok(())
         }
         async fn delete(&self, id: &SongId) -> Result<(), AppError> {
-            self.songs.lock().await.retain(|s| s.id != *id); Ok(())
+            self.songs.lock().await.retain(|s| s.id != *id);
+            Ok(())
         }
         async fn list_by_artist(&self, artist_id: &UserId) -> Result<Vec<Song>, AppError> {
-            Ok(self.songs.lock().await.iter().filter(|s| s.artist_id == *artist_id).cloned().collect())
+            Ok(self
+                .songs
+                .lock()
+                .await
+                .iter()
+                .filter(|s| s.artist_id == *artist_id)
+                .cloned()
+                .collect())
         }
         async fn list_by_label(&self, label_id: &LabelId) -> Result<Vec<Song>, AppError> {
-            Ok(self.songs.lock().await.iter()
-                .filter(|s| s.label_id.as_ref() == Some(label_id)).cloned().collect())
+            Ok(self
+                .songs
+                .lock()
+                .await
+                .iter()
+                .filter(|s| s.label_id.as_ref() == Some(label_id))
+                .cloned()
+                .collect())
         }
     }
 
@@ -188,21 +215,47 @@ mod tests {
         users: Mutex<Vec<User>>,
     }
     impl MockUserRepo {
-        fn new() -> Self { Self { users: Mutex::new(Vec::new()) } }
-        fn with_user(user: User) -> Self { Self { users: Mutex::new(vec![user]) } }
+        fn new() -> Self {
+            Self {
+                users: Mutex::new(Vec::new()),
+            }
+        }
+        fn with_user(user: User) -> Self {
+            Self {
+                users: Mutex::new(vec![user]),
+            }
+        }
     }
     #[async_trait::async_trait]
     impl UserRepository for MockUserRepo {
         async fn get_by_id(&self, id: &UserId) -> Result<Option<User>, AppError> {
-            Ok(self.users.lock().await.iter().find(|u| u.id == *id).cloned())
+            Ok(self
+                .users
+                .lock()
+                .await
+                .iter()
+                .find(|u| u.id == *id)
+                .cloned())
         }
-        async fn get_by_email(&self, _: &str) -> Result<Option<User>, AppError> { Ok(None) }
-        async fn find(&self, _: &PaginationOptions, _: &UserFilter) -> Result<Paginated<User>, AppError> {
+        async fn get_by_email(&self, _: &str) -> Result<Option<User>, AppError> {
+            Ok(None)
+        }
+        async fn find(
+            &self,
+            _: &PaginationOptions,
+            _: &UserFilter,
+        ) -> Result<Paginated<User>, AppError> {
             Ok(Paginated::new(vec![], 1, 10, 0))
         }
-        async fn save(&self, _: &User) -> Result<(), AppError> { Ok(()) }
-        async fn update(&self, _: &User) -> Result<(), AppError> { Ok(()) }
-        async fn delete(&self, _: &UserId) -> Result<(), AppError> { Ok(()) }
+        async fn save(&self, _: &User) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn update(&self, _: &User) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn delete(&self, _: &UserId) -> Result<(), AppError> {
+            Ok(())
+        }
     }
 
     struct MockLabelRepo {
@@ -210,28 +263,65 @@ mod tests {
         members: Mutex<Vec<LabelMember>>,
     }
     impl MockLabelRepo {
-        fn new() -> Self { Self { labels: Mutex::new(Vec::new()), members: Mutex::new(Vec::new()) } }
+        fn new() -> Self {
+            Self {
+                labels: Mutex::new(Vec::new()),
+                members: Mutex::new(Vec::new()),
+            }
+        }
     }
     #[async_trait::async_trait]
     impl LabelRepository for MockLabelRepo {
         async fn save(&self, label: &Label) -> Result<(), AppError> {
-            self.labels.lock().await.push(label.clone()); Ok(())
+            self.labels.lock().await.push(label.clone());
+            Ok(())
         }
         async fn get_by_id(&self, id: &LabelId) -> Result<Option<Label>, AppError> {
-            Ok(self.labels.lock().await.iter().find(|l| l.id == *id).cloned())
+            Ok(self
+                .labels
+                .lock()
+                .await
+                .iter()
+                .find(|l| l.id == *id)
+                .cloned())
         }
-        async fn get_by_name(&self, _: &str) -> Result<Option<Label>, AppError> { Ok(None) }
-        async fn list_all(&self) -> Result<Vec<Label>, AppError> { Ok(vec![]) }
-        async fn update(&self, _: &Label) -> Result<(), AppError> { Ok(()) }
-        async fn delete(&self, _: &LabelId) -> Result<(), AppError> { Ok(()) }
-        async fn add_member(&self, _: &LabelMember) -> Result<(), AppError> { Ok(()) }
-        async fn remove_member(&self, _: &LabelId, _: &UserId) -> Result<(), AppError> { Ok(()) }
-        async fn get_member(&self, label_id: &LabelId, user_id: &UserId) -> Result<Option<LabelMember>, AppError> {
-            Ok(self.members.lock().await.iter()
-                .find(|m| m.label_id == *label_id && m.user_id == *user_id).cloned())
+        async fn get_by_name(&self, _: &str) -> Result<Option<Label>, AppError> {
+            Ok(None)
         }
-        async fn list_members(&self, _: &LabelId) -> Result<Vec<LabelMember>, AppError> { Ok(vec![]) }
-        async fn get_user_labels(&self, _: &UserId) -> Result<Vec<Label>, AppError> { Ok(vec![]) }
+        async fn list_all(&self) -> Result<Vec<Label>, AppError> {
+            Ok(vec![])
+        }
+        async fn update(&self, _: &Label) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn delete(&self, _: &LabelId) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn add_member(&self, _: &LabelMember) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn remove_member(&self, _: &LabelId, _: &UserId) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn get_member(
+            &self,
+            label_id: &LabelId,
+            user_id: &UserId,
+        ) -> Result<Option<LabelMember>, AppError> {
+            Ok(self
+                .members
+                .lock()
+                .await
+                .iter()
+                .find(|m| m.label_id == *label_id && m.user_id == *user_id)
+                .cloned())
+        }
+        async fn list_members(&self, _: &LabelId) -> Result<Vec<LabelMember>, AppError> {
+            Ok(vec![])
+        }
+        async fn get_user_labels(&self, _: &UserId) -> Result<Vec<Label>, AppError> {
+            Ok(vec![])
+        }
     }
 
     fn make_user() -> User {
@@ -243,7 +333,12 @@ mod tests {
     }
 
     fn make_member(label_id: LabelId, user_id: UserId, role: LabelRole) -> LabelMember {
-        LabelMember { label_id, user_id, role, joined_at: Utc::now() }
+        LabelMember {
+            label_id,
+            user_id,
+            role,
+            joined_at: Utc::now(),
+        }
     }
 
     fn make_create_req(artist_id: UserId) -> CreateSongRequest {
@@ -258,8 +353,16 @@ mod tests {
         }
     }
 
-    fn make_svc(song_repo: MockSongRepo, user_repo: MockUserRepo, label_repo: MockLabelRepo) -> SongService {
-        SongService::new(Arc::new(song_repo), Arc::new(user_repo), Arc::new(label_repo))
+    fn make_svc(
+        song_repo: MockSongRepo,
+        user_repo: MockUserRepo,
+        label_repo: MockLabelRepo,
+    ) -> SongService {
+        SongService::new(
+            Arc::new(song_repo),
+            Arc::new(user_repo),
+            Arc::new(label_repo),
+        )
     }
 
     // ========================================================================
@@ -269,8 +372,15 @@ mod tests {
     #[tokio::test]
     async fn create_song_no_label() {
         let user = make_user();
-        let svc = make_svc(MockSongRepo::new(), MockUserRepo::with_user(user.clone()), MockLabelRepo::new());
-        let song = svc.create_song(make_create_req(user.id.clone())).await.unwrap();
+        let svc = make_svc(
+            MockSongRepo::new(),
+            MockUserRepo::with_user(user.clone()),
+            MockLabelRepo::new(),
+        );
+        let song = svc
+            .create_song(make_create_req(user.id.clone()))
+            .await
+            .unwrap();
         assert_eq!(song.title, "Test Song");
         assert!(song.label_id.is_none());
     }
@@ -281,9 +391,17 @@ mod tests {
         let label = make_label();
         let label_repo = MockLabelRepo::new();
         label_repo.labels.lock().await.push(label.clone());
-        label_repo.members.lock().await.push(make_member(label.id.clone(), user.id.clone(), LabelRole::Artist));
+        label_repo.members.lock().await.push(make_member(
+            label.id.clone(),
+            user.id.clone(),
+            LabelRole::Artist,
+        ));
 
-        let svc = make_svc(MockSongRepo::new(), MockUserRepo::with_user(user.clone()), label_repo);
+        let svc = make_svc(
+            MockSongRepo::new(),
+            MockUserRepo::with_user(user.clone()),
+            label_repo,
+        );
         let mut req = make_create_req(user.id.clone());
         req.label_id = Some(label.id.clone());
         let song = svc.create_song(req).await.unwrap();
@@ -292,15 +410,26 @@ mod tests {
 
     #[tokio::test]
     async fn create_song_artist_not_found() {
-        let svc = make_svc(MockSongRepo::new(), MockUserRepo::new(), MockLabelRepo::new());
-        let err = svc.create_song(make_create_req(UserId::new())).await.unwrap_err();
+        let svc = make_svc(
+            MockSongRepo::new(),
+            MockUserRepo::new(),
+            MockLabelRepo::new(),
+        );
+        let err = svc
+            .create_song(make_create_req(UserId::new()))
+            .await
+            .unwrap_err();
         assert_eq!(err.code, "NOT_FOUND");
     }
 
     #[tokio::test]
     async fn create_song_label_not_found() {
         let user = make_user();
-        let svc = make_svc(MockSongRepo::new(), MockUserRepo::with_user(user.clone()), MockLabelRepo::new());
+        let svc = make_svc(
+            MockSongRepo::new(),
+            MockUserRepo::with_user(user.clone()),
+            MockLabelRepo::new(),
+        );
         let mut req = make_create_req(user.id.clone());
         req.label_id = Some(LabelId::new());
         let err = svc.create_song(req).await.unwrap_err();
@@ -315,7 +444,11 @@ mod tests {
         label_repo.labels.lock().await.push(label.clone());
         // No member added
 
-        let svc = make_svc(MockSongRepo::new(), MockUserRepo::with_user(user.clone()), label_repo);
+        let svc = make_svc(
+            MockSongRepo::new(),
+            MockUserRepo::with_user(user.clone()),
+            label_repo,
+        );
         let mut req = make_create_req(user.id.clone());
         req.label_id = Some(label.id.clone());
         let err = svc.create_song(req).await.unwrap_err();
@@ -329,9 +462,17 @@ mod tests {
         let label = make_label();
         let label_repo = MockLabelRepo::new();
         label_repo.labels.lock().await.push(label.clone());
-        label_repo.members.lock().await.push(make_member(label.id.clone(), user.id.clone(), LabelRole::Rep));
+        label_repo.members.lock().await.push(make_member(
+            label.id.clone(),
+            user.id.clone(),
+            LabelRole::Rep,
+        ));
 
-        let svc = make_svc(MockSongRepo::new(), MockUserRepo::with_user(user.clone()), label_repo);
+        let svc = make_svc(
+            MockSongRepo::new(),
+            MockUserRepo::with_user(user.clone()),
+            label_repo,
+        );
         let mut req = make_create_req(user.id.clone());
         req.label_id = Some(label.id.clone());
         let err = svc.create_song(req).await.unwrap_err();
@@ -345,9 +486,17 @@ mod tests {
         let label = make_label();
         let label_repo = MockLabelRepo::new();
         label_repo.labels.lock().await.push(label.clone());
-        label_repo.members.lock().await.push(make_member(label.id.clone(), user.id.clone(), LabelRole::Owner));
+        label_repo.members.lock().await.push(make_member(
+            label.id.clone(),
+            user.id.clone(),
+            LabelRole::Owner,
+        ));
 
-        let svc = make_svc(MockSongRepo::new(), MockUserRepo::with_user(user.clone()), label_repo);
+        let svc = make_svc(
+            MockSongRepo::new(),
+            MockUserRepo::with_user(user.clone()),
+            label_repo,
+        );
         let mut req = make_create_req(user.id.clone());
         req.label_id = Some(label.id.clone());
         let err = svc.create_song(req).await.unwrap_err();
@@ -357,7 +506,11 @@ mod tests {
     #[tokio::test]
     async fn create_song_empty_title() {
         let user = make_user();
-        let svc = make_svc(MockSongRepo::new(), MockUserRepo::with_user(user.clone()), MockLabelRepo::new());
+        let svc = make_svc(
+            MockSongRepo::new(),
+            MockUserRepo::with_user(user.clone()),
+            MockLabelRepo::new(),
+        );
         let mut req = make_create_req(user.id.clone());
         req.title = "  ".into();
         let err = svc.create_song(req).await.unwrap_err();
@@ -367,7 +520,11 @@ mod tests {
     #[tokio::test]
     async fn create_song_zero_duration() {
         let user = make_user();
-        let svc = make_svc(MockSongRepo::new(), MockUserRepo::with_user(user.clone()), MockLabelRepo::new());
+        let svc = make_svc(
+            MockSongRepo::new(),
+            MockUserRepo::with_user(user.clone()),
+            MockLabelRepo::new(),
+        );
         let mut req = make_create_req(user.id.clone());
         req.duration_seconds = 0;
         let err = svc.create_song(req).await.unwrap_err();
@@ -377,7 +534,11 @@ mod tests {
     #[tokio::test]
     async fn create_song_negative_duration() {
         let user = make_user();
-        let svc = make_svc(MockSongRepo::new(), MockUserRepo::with_user(user.clone()), MockLabelRepo::new());
+        let svc = make_svc(
+            MockSongRepo::new(),
+            MockUserRepo::with_user(user.clone()),
+            MockLabelRepo::new(),
+        );
         let mut req = make_create_req(user.id.clone());
         req.duration_seconds = -5;
         let err = svc.create_song(req).await.unwrap_err();
@@ -391,15 +552,26 @@ mod tests {
     #[tokio::test]
     async fn get_song_success() {
         let user = make_user();
-        let svc = make_svc(MockSongRepo::new(), MockUserRepo::with_user(user.clone()), MockLabelRepo::new());
-        let created = svc.create_song(make_create_req(user.id.clone())).await.unwrap();
+        let svc = make_svc(
+            MockSongRepo::new(),
+            MockUserRepo::with_user(user.clone()),
+            MockLabelRepo::new(),
+        );
+        let created = svc
+            .create_song(make_create_req(user.id.clone()))
+            .await
+            .unwrap();
         let found = svc.get_song(&created.id).await.unwrap();
         assert_eq!(found.title, "Test Song");
     }
 
     #[tokio::test]
     async fn get_song_not_found() {
-        let svc = make_svc(MockSongRepo::new(), MockUserRepo::new(), MockLabelRepo::new());
+        let svc = make_svc(
+            MockSongRepo::new(),
+            MockUserRepo::new(),
+            MockLabelRepo::new(),
+        );
         let err = svc.get_song(&SongId::new()).await.unwrap_err();
         assert_eq!(err.code, "song.not_found");
     }
@@ -407,14 +579,26 @@ mod tests {
     #[tokio::test]
     async fn find_songs_paginated() {
         let user = make_user();
-        let svc = make_svc(MockSongRepo::new(), MockUserRepo::with_user(user.clone()), MockLabelRepo::new());
+        let svc = make_svc(
+            MockSongRepo::new(),
+            MockUserRepo::with_user(user.clone()),
+            MockLabelRepo::new(),
+        );
         for _ in 0..3 {
-            svc.create_song(make_create_req(user.id.clone())).await.unwrap();
+            svc.create_song(make_create_req(user.id.clone()))
+                .await
+                .unwrap();
         }
-        let result = svc.find_songs(
-            &PaginationOptions { page: 1, page_size: 10 },
-            &SongFilter::default(),
-        ).await.unwrap();
+        let result = svc
+            .find_songs(
+                &PaginationOptions {
+                    page: 1,
+                    page_size: 10,
+                },
+                &SongFilter::default(),
+            )
+            .await
+            .unwrap();
         assert_eq!(result.items.len(), 3);
         assert_eq!(result.pagination.total, 3);
     }
@@ -422,9 +606,17 @@ mod tests {
     #[tokio::test]
     async fn list_by_artist_success() {
         let user = make_user();
-        let svc = make_svc(MockSongRepo::new(), MockUserRepo::with_user(user.clone()), MockLabelRepo::new());
-        svc.create_song(make_create_req(user.id.clone())).await.unwrap();
-        svc.create_song(make_create_req(user.id.clone())).await.unwrap();
+        let svc = make_svc(
+            MockSongRepo::new(),
+            MockUserRepo::with_user(user.clone()),
+            MockLabelRepo::new(),
+        );
+        svc.create_song(make_create_req(user.id.clone()))
+            .await
+            .unwrap();
+        svc.create_song(make_create_req(user.id.clone()))
+            .await
+            .unwrap();
         let songs = svc.list_by_artist(&user.id).await.unwrap();
         assert_eq!(songs.len(), 2);
     }
@@ -435,15 +627,25 @@ mod tests {
         let label = make_label();
         let label_repo = MockLabelRepo::new();
         label_repo.labels.lock().await.push(label.clone());
-        label_repo.members.lock().await.push(make_member(label.id.clone(), user.id.clone(), LabelRole::Artist));
+        label_repo.members.lock().await.push(make_member(
+            label.id.clone(),
+            user.id.clone(),
+            LabelRole::Artist,
+        ));
 
-        let svc = make_svc(MockSongRepo::new(), MockUserRepo::with_user(user.clone()), label_repo);
+        let svc = make_svc(
+            MockSongRepo::new(),
+            MockUserRepo::with_user(user.clone()),
+            label_repo,
+        );
 
         let mut req = make_create_req(user.id.clone());
         req.label_id = Some(label.id.clone());
         svc.create_song(req).await.unwrap();
         // Song without label
-        svc.create_song(make_create_req(user.id.clone())).await.unwrap();
+        svc.create_song(make_create_req(user.id.clone()))
+            .await
+            .unwrap();
 
         let songs = svc.list_by_label(&label.id).await.unwrap();
         assert_eq!(songs.len(), 1);
@@ -456,15 +658,28 @@ mod tests {
     #[tokio::test]
     async fn update_song_success() {
         let user = make_user();
-        let svc = make_svc(MockSongRepo::new(), MockUserRepo::with_user(user.clone()), MockLabelRepo::new());
-        let song = svc.create_song(make_create_req(user.id.clone())).await.unwrap();
-        let updated = svc.update_song(&song.id, UpdateSongRequest {
-            title: Some("New Title".into()),
-            album: Some("New Album".into()),
-            genre: Some("Jazz".into()),
-            isrc: Some("GB999".into()),
-            duration_seconds: Some(300),
-        }).await.unwrap();
+        let svc = make_svc(
+            MockSongRepo::new(),
+            MockUserRepo::with_user(user.clone()),
+            MockLabelRepo::new(),
+        );
+        let song = svc
+            .create_song(make_create_req(user.id.clone()))
+            .await
+            .unwrap();
+        let updated = svc
+            .update_song(
+                &song.id,
+                UpdateSongRequest {
+                    title: Some("New Title".into()),
+                    album: Some("New Album".into()),
+                    genre: Some("Jazz".into()),
+                    isrc: Some("GB999".into()),
+                    duration_seconds: Some(300),
+                },
+            )
+            .await
+            .unwrap();
         assert_eq!(updated.title, "New Title");
         assert_eq!(updated.album.as_deref(), Some("New Album"));
         assert_eq!(updated.genre.as_deref(), Some("Jazz"));
@@ -474,11 +689,28 @@ mod tests {
     #[tokio::test]
     async fn update_song_partial() {
         let user = make_user();
-        let svc = make_svc(MockSongRepo::new(), MockUserRepo::with_user(user.clone()), MockLabelRepo::new());
-        let song = svc.create_song(make_create_req(user.id.clone())).await.unwrap();
-        let updated = svc.update_song(&song.id, UpdateSongRequest {
-            title: Some("New".into()), album: None, genre: None, isrc: None, duration_seconds: None,
-        }).await.unwrap();
+        let svc = make_svc(
+            MockSongRepo::new(),
+            MockUserRepo::with_user(user.clone()),
+            MockLabelRepo::new(),
+        );
+        let song = svc
+            .create_song(make_create_req(user.id.clone()))
+            .await
+            .unwrap();
+        let updated = svc
+            .update_song(
+                &song.id,
+                UpdateSongRequest {
+                    title: Some("New".into()),
+                    album: None,
+                    genre: None,
+                    isrc: None,
+                    duration_seconds: None,
+                },
+            )
+            .await
+            .unwrap();
         assert_eq!(updated.title, "New");
         assert_eq!(updated.album.as_deref(), Some("Album"));
         assert_eq!(updated.duration_seconds, 240);
@@ -486,32 +718,80 @@ mod tests {
 
     #[tokio::test]
     async fn update_song_not_found() {
-        let svc = make_svc(MockSongRepo::new(), MockUserRepo::new(), MockLabelRepo::new());
-        let err = svc.update_song(&SongId::new(), UpdateSongRequest {
-            title: Some("X".into()), album: None, genre: None, isrc: None, duration_seconds: None,
-        }).await.unwrap_err();
+        let svc = make_svc(
+            MockSongRepo::new(),
+            MockUserRepo::new(),
+            MockLabelRepo::new(),
+        );
+        let err = svc
+            .update_song(
+                &SongId::new(),
+                UpdateSongRequest {
+                    title: Some("X".into()),
+                    album: None,
+                    genre: None,
+                    isrc: None,
+                    duration_seconds: None,
+                },
+            )
+            .await
+            .unwrap_err();
         assert_eq!(err.code, "song.not_found");
     }
 
     #[tokio::test]
     async fn update_song_empty_title() {
         let user = make_user();
-        let svc = make_svc(MockSongRepo::new(), MockUserRepo::with_user(user.clone()), MockLabelRepo::new());
-        let song = svc.create_song(make_create_req(user.id.clone())).await.unwrap();
-        let err = svc.update_song(&song.id, UpdateSongRequest {
-            title: Some("".into()), album: None, genre: None, isrc: None, duration_seconds: None,
-        }).await.unwrap_err();
+        let svc = make_svc(
+            MockSongRepo::new(),
+            MockUserRepo::with_user(user.clone()),
+            MockLabelRepo::new(),
+        );
+        let song = svc
+            .create_song(make_create_req(user.id.clone()))
+            .await
+            .unwrap();
+        let err = svc
+            .update_song(
+                &song.id,
+                UpdateSongRequest {
+                    title: Some("".into()),
+                    album: None,
+                    genre: None,
+                    isrc: None,
+                    duration_seconds: None,
+                },
+            )
+            .await
+            .unwrap_err();
         assert_eq!(err.code, "VALIDATION_ERROR");
     }
 
     #[tokio::test]
     async fn update_song_invalid_duration() {
         let user = make_user();
-        let svc = make_svc(MockSongRepo::new(), MockUserRepo::with_user(user.clone()), MockLabelRepo::new());
-        let song = svc.create_song(make_create_req(user.id.clone())).await.unwrap();
-        let err = svc.update_song(&song.id, UpdateSongRequest {
-            title: None, album: None, genre: None, isrc: None, duration_seconds: Some(0),
-        }).await.unwrap_err();
+        let svc = make_svc(
+            MockSongRepo::new(),
+            MockUserRepo::with_user(user.clone()),
+            MockLabelRepo::new(),
+        );
+        let song = svc
+            .create_song(make_create_req(user.id.clone()))
+            .await
+            .unwrap();
+        let err = svc
+            .update_song(
+                &song.id,
+                UpdateSongRequest {
+                    title: None,
+                    album: None,
+                    genre: None,
+                    isrc: None,
+                    duration_seconds: Some(0),
+                },
+            )
+            .await
+            .unwrap_err();
         assert_eq!(err.code, "VALIDATION_ERROR");
     }
 
@@ -522,8 +802,15 @@ mod tests {
     #[tokio::test]
     async fn delete_song_success() {
         let user = make_user();
-        let svc = make_svc(MockSongRepo::new(), MockUserRepo::with_user(user.clone()), MockLabelRepo::new());
-        let song = svc.create_song(make_create_req(user.id.clone())).await.unwrap();
+        let svc = make_svc(
+            MockSongRepo::new(),
+            MockUserRepo::with_user(user.clone()),
+            MockLabelRepo::new(),
+        );
+        let song = svc
+            .create_song(make_create_req(user.id.clone()))
+            .await
+            .unwrap();
         svc.delete_song(&song.id).await.unwrap();
         let err = svc.get_song(&song.id).await.unwrap_err();
         assert_eq!(err.code, "song.not_found");
@@ -531,7 +818,11 @@ mod tests {
 
     #[tokio::test]
     async fn delete_song_not_found() {
-        let svc = make_svc(MockSongRepo::new(), MockUserRepo::new(), MockLabelRepo::new());
+        let svc = make_svc(
+            MockSongRepo::new(),
+            MockUserRepo::new(),
+            MockLabelRepo::new(),
+        );
         let err = svc.delete_song(&SongId::new()).await.unwrap_err();
         assert_eq!(err.code, "song.not_found");
     }

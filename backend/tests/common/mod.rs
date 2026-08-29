@@ -1,6 +1,6 @@
 use sqlx::PgPool;
-use testcontainers::runners::AsyncRunner;
 use testcontainers::ContainerAsync;
+use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::postgres::Postgres;
 
 pub struct TestDb {
@@ -20,8 +20,7 @@ impl TestDb {
             .await
             .expect("Failed to get postgres port");
 
-        let connection_string =
-            format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
+        let connection_string = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
 
         let pool = PgPool::connect(&connection_string)
             .await

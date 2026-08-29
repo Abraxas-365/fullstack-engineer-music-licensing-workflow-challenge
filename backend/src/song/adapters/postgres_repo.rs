@@ -5,7 +5,8 @@ use crate::kernel::{LabelId, Paginated, PaginationOptions, SongId, UserId};
 use crate::song::model::{Song, SongFilter};
 use crate::song::port::SongRepository;
 
-const SONG_COLUMNS: &str = "id, title, artist_id, label_id, album, duration_seconds, genre, isrc, created_at, updated_at";
+const SONG_COLUMNS: &str =
+    "id, title, artist_id, label_id, album, duration_seconds, genre, isrc, created_at, updated_at";
 
 pub struct PostgresSongRepository {
     pool: PgPool,
@@ -173,8 +174,9 @@ fn song_from_row(row: &sqlx::postgres::PgRow) -> Result<Song, AppError> {
             .try_get("title")
             .map_err(|e| AppError::internal(format!("Failed to read column 'title': {e}")))?,
         artist_id: UserId::from_string(
-            row.try_get("artist_id")
-                .map_err(|e| AppError::internal(format!("Failed to read column 'artist_id': {e}")))?,
+            row.try_get("artist_id").map_err(|e| {
+                AppError::internal(format!("Failed to read column 'artist_id': {e}"))
+            })?,
         ),
         label_id: row
             .try_get::<Option<String>, _>("label_id")
@@ -183,9 +185,9 @@ fn song_from_row(row: &sqlx::postgres::PgRow) -> Result<Song, AppError> {
         album: row
             .try_get("album")
             .map_err(|e| AppError::internal(format!("Failed to read column 'album': {e}")))?,
-        duration_seconds: row
-            .try_get("duration_seconds")
-            .map_err(|e| AppError::internal(format!("Failed to read column 'duration_seconds': {e}")))?,
+        duration_seconds: row.try_get("duration_seconds").map_err(|e| {
+            AppError::internal(format!("Failed to read column 'duration_seconds': {e}"))
+        })?,
         genre: row
             .try_get("genre")
             .map_err(|e| AppError::internal(format!("Failed to read column 'genre': {e}")))?,

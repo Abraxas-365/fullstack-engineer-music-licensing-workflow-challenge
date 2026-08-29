@@ -6,8 +6,8 @@ mod service;
 
 pub use error::UserError;
 pub use model::{
-    CreateUserRequest, OAuthProvider, SuspendUserRequest, UpdateUserRequest, User,
-    UserDetailsDTO, UserFilter, UserResponse, UserStatus,
+    CreateUserRequest, OAuthProvider, SuspendUserRequest, UpdateUserRequest, User, UserDetailsDTO,
+    UserFilter, UserResponse, UserStatus,
 };
 pub use port::{PasswordService, UserRepository};
 pub use service::UserService;

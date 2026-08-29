@@ -1,7 +1,7 @@
 use std::future::{Future, Ready, ready};
 use std::pin::Pin;
 
-use actix_web::dev::{forward_ready, Payload, Service, ServiceRequest, ServiceResponse, Transform};
+use actix_web::dev::{Payload, Service, ServiceRequest, ServiceResponse, Transform, forward_ready};
 use actix_web::web::Data;
 use actix_web::{FromRequest, HttpRequest};
 
@@ -67,8 +67,7 @@ impl FromRequest for AuthContext {
 }
 
 fn extract_auth(req: &HttpRequest) -> Result<AuthContext, AppError> {
-    let token =
-        extract_bearer_token(req).ok_or_else(|| AuthError::unauthorized())?;
+    let token = extract_bearer_token(req).ok_or_else(|| AuthError::unauthorized())?;
 
     let token_svc = req
         .app_data::<Data<dyn TokenService>>()

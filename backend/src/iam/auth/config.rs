@@ -35,7 +35,7 @@ impl Default for AuthConfig {
         Self {
             jwt: JWTConfig {
                 secret_key: String::new(),
-                access_token_ttl: Duration::from_secs(15 * 60),     // 15 minutes
+                access_token_ttl: Duration::from_secs(15 * 60), // 15 minutes
                 refresh_token_ttl: Duration::from_secs(7 * 24 * 3600), // 7 days
                 issuer: "backend".to_string(),
             },

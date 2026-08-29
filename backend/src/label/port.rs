@@ -15,7 +15,11 @@ pub trait LabelRepository: Send + Sync {
     // Membership
     async fn add_member(&self, member: &LabelMember) -> Result<(), AppError>;
     async fn remove_member(&self, label_id: &LabelId, user_id: &UserId) -> Result<(), AppError>;
-    async fn get_member(&self, label_id: &LabelId, user_id: &UserId) -> Result<Option<LabelMember>, AppError>;
+    async fn get_member(
+        &self,
+        label_id: &LabelId,
+        user_id: &UserId,
+    ) -> Result<Option<LabelMember>, AppError>;
     async fn list_members(&self, label_id: &LabelId) -> Result<Vec<LabelMember>, AppError>;
     async fn get_user_labels(&self, user_id: &UserId) -> Result<Vec<Label>, AppError>;
 }

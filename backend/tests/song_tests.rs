@@ -8,7 +8,9 @@ use backend::kernel::{LabelId, SongId, UserId};
 use backend::label::adapters::PostgresLabelRepository;
 use backend::label::{AddMemberRequest, CreateLabelRequest, LabelRepository, LabelService};
 use backend::song::adapters::PostgresSongRepository;
-use backend::song::{CreateSongRequest, SongFilter, SongRepository, SongService, UpdateSongRequest};
+use backend::song::{
+    CreateSongRequest, SongFilter, SongRepository, SongService, UpdateSongRequest,
+};
 
 use common::TestDb;
 
@@ -30,11 +32,7 @@ impl TestContext {
         let song_repo = Arc::new(PostgresSongRepository::new(db.pool.clone()));
         let password_svc = Arc::new(BcryptPasswordService::new());
         let label_svc = LabelService::new(label_repo.clone(), user_repo.clone());
-        let song_svc = SongService::new(
-            song_repo.clone(),
-            user_repo.clone(),
-            label_repo.clone(),
-        );
+        let song_svc = SongService::new(song_repo.clone(), user_repo.clone(), label_repo.clone());
 
         Self {
             song_svc,
@@ -162,15 +160,30 @@ async fn test_repo_list_by_artist() {
     let artist2 = ctx.create_user("artist2@example.com").await;
 
     ctx.song_repo
-        .save(&backend::song::Song::new("Song A".into(), artist1.id.clone(), None, 100))
+        .save(&backend::song::Song::new(
+            "Song A".into(),
+            artist1.id.clone(),
+            None,
+            100,
+        ))
         .await
         .unwrap();
     ctx.song_repo
-        .save(&backend::song::Song::new("Song B".into(), artist1.id.clone(), None, 200))
+        .save(&backend::song::Song::new(
+            "Song B".into(),
+            artist1.id.clone(),
+            None,
+            200,
+        ))
         .await
         .unwrap();
     ctx.song_repo
-        .save(&backend::song::Song::new("Song C".into(), artist2.id.clone(), None, 300))
+        .save(&backend::song::Song::new(
+            "Song C".into(),
+            artist2.id.clone(),
+            None,
+            300,
+        ))
         .await
         .unwrap();
 
@@ -184,7 +197,12 @@ async fn test_repo_list_by_label() {
     let artist = ctx.create_user("artist@example.com").await;
     let label = ctx.create_label_with_artist("My Label", &artist).await;
 
-    let song1 = backend::song::Song::new("Song A".into(), artist.id.clone(), Some(label.id.clone()), 100);
+    let song1 = backend::song::Song::new(
+        "Song A".into(),
+        artist.id.clone(),
+        Some(label.id.clone()),
+        100,
+    );
     let song2 = backend::song::Song::new("Song B".into(), artist.id.clone(), None, 200);
     ctx.song_repo.save(&song1).await.unwrap();
     ctx.song_repo.save(&song2).await.unwrap();
@@ -200,11 +218,21 @@ async fn test_repo_find_with_search_filter() {
     let artist = ctx.create_user("artist@example.com").await;
 
     ctx.song_repo
-        .save(&backend::song::Song::new("Bohemian Rhapsody".into(), artist.id.clone(), None, 355))
+        .save(&backend::song::Song::new(
+            "Bohemian Rhapsody".into(),
+            artist.id.clone(),
+            None,
+            355,
+        ))
         .await
         .unwrap();
     ctx.song_repo
-        .save(&backend::song::Song::new("Hotel California".into(), artist.id.clone(), None, 390))
+        .save(&backend::song::Song::new(
+            "Hotel California".into(),
+            artist.id.clone(),
+            None,
+            390,
+        ))
         .await
         .unwrap();
 
@@ -212,7 +240,10 @@ async fn test_repo_find_with_search_filter() {
         search: Some("bohemian".into()),
         ..Default::default()
     };
-    let opts = backend::kernel::PaginationOptions { page: 1, page_size: 10 };
+    let opts = backend::kernel::PaginationOptions {
+        page: 1,
+        page_size: 10,
+    };
     let result = ctx.song_repo.find(&opts, &filter).await.unwrap();
     assert_eq!(result.items.len(), 1);
     assert_eq!(result.items[0].title, "Bohemian Rhapsody");
@@ -234,7 +265,10 @@ async fn test_repo_find_with_genre_filter() {
         genre: Some("Jazz".into()),
         ..Default::default()
     };
-    let opts = backend::kernel::PaginationOptions { page: 1, page_size: 10 };
+    let opts = backend::kernel::PaginationOptions {
+        page: 1,
+        page_size: 10,
+    };
     let result = ctx.song_repo.find(&opts, &filter).await.unwrap();
     assert_eq!(result.items.len(), 1);
     assert_eq!(result.items[0].title, "Jazz Song");
@@ -247,11 +281,21 @@ async fn test_repo_find_with_artist_filter() {
     let artist2 = ctx.create_user("artist2@example.com").await;
 
     ctx.song_repo
-        .save(&backend::song::Song::new("A1".into(), artist1.id.clone(), None, 100))
+        .save(&backend::song::Song::new(
+            "A1".into(),
+            artist1.id.clone(),
+            None,
+            100,
+        ))
         .await
         .unwrap();
     ctx.song_repo
-        .save(&backend::song::Song::new("A2".into(), artist2.id.clone(), None, 200))
+        .save(&backend::song::Song::new(
+            "A2".into(),
+            artist2.id.clone(),
+            None,
+            200,
+        ))
         .await
         .unwrap();
 
@@ -259,7 +303,10 @@ async fn test_repo_find_with_artist_filter() {
         artist_id: Some(artist1.id.clone()),
         ..Default::default()
     };
-    let opts = backend::kernel::PaginationOptions { page: 1, page_size: 10 };
+    let opts = backend::kernel::PaginationOptions {
+        page: 1,
+        page_size: 10,
+    };
     let result = ctx.song_repo.find(&opts, &filter).await.unwrap();
     assert_eq!(result.items.len(), 1);
     assert_eq!(result.items[0].title, "A1");
@@ -272,14 +319,25 @@ async fn test_repo_find_pagination() {
 
     for i in 1..=5 {
         ctx.song_repo
-            .save(&backend::song::Song::new(format!("Song {i}"), artist.id.clone(), None, 100 * i))
+            .save(&backend::song::Song::new(
+                format!("Song {i}"),
+                artist.id.clone(),
+                None,
+                100 * i,
+            ))
             .await
             .unwrap();
     }
 
     let page1 = ctx
         .song_repo
-        .find(&backend::kernel::PaginationOptions { page: 1, page_size: 2 }, &SongFilter::default())
+        .find(
+            &backend::kernel::PaginationOptions {
+                page: 1,
+                page_size: 2,
+            },
+            &SongFilter::default(),
+        )
         .await
         .unwrap();
     assert_eq!(page1.items.len(), 2);
@@ -288,7 +346,13 @@ async fn test_repo_find_pagination() {
 
     let page3 = ctx
         .song_repo
-        .find(&backend::kernel::PaginationOptions { page: 3, page_size: 2 }, &SongFilter::default())
+        .find(
+            &backend::kernel::PaginationOptions {
+                page: 3,
+                page_size: 2,
+            },
+            &SongFilter::default(),
+        )
         .await
         .unwrap();
     assert_eq!(page3.items.len(), 1);
@@ -321,7 +385,11 @@ async fn test_service_create_song_no_label() {
     let ctx = TestContext::new().await;
     let artist = ctx.create_user("artist@example.com").await;
 
-    let song = ctx.song_svc.create_song(ctx.make_create_req(artist.id.clone())).await.unwrap();
+    let song = ctx
+        .song_svc
+        .create_song(ctx.make_create_req(artist.id.clone()))
+        .await
+        .unwrap();
 
     assert_eq!(song.title, "Test Song");
     assert_eq!(song.artist_id.as_str(), artist.id.as_str());
@@ -498,7 +566,11 @@ async fn test_service_get_song() {
     let ctx = TestContext::new().await;
     let artist = ctx.create_user("artist@example.com").await;
 
-    let created = ctx.song_svc.create_song(ctx.make_create_req(artist.id.clone())).await.unwrap();
+    let created = ctx
+        .song_svc
+        .create_song(ctx.make_create_req(artist.id.clone()))
+        .await
+        .unwrap();
     let found = ctx.song_svc.get_song(&created.id).await.unwrap();
 
     assert_eq!(found.id.as_str(), created.id.as_str());
@@ -526,7 +598,13 @@ async fn test_service_find_songs() {
 
     let result = ctx
         .song_svc
-        .find_songs(&backend::kernel::PaginationOptions { page: 1, page_size: 10 }, &SongFilter::default())
+        .find_songs(
+            &backend::kernel::PaginationOptions {
+                page: 1,
+                page_size: 10,
+            },
+            &SongFilter::default(),
+        )
         .await
         .unwrap();
 
@@ -540,9 +618,18 @@ async fn test_service_list_by_artist() {
     let artist1 = ctx.create_user("artist1@example.com").await;
     let artist2 = ctx.create_user("artist2@example.com").await;
 
-    ctx.song_svc.create_song(ctx.make_create_req(artist1.id.clone())).await.unwrap();
-    ctx.song_svc.create_song(ctx.make_create_req(artist1.id.clone())).await.unwrap();
-    ctx.song_svc.create_song(ctx.make_create_req(artist2.id.clone())).await.unwrap();
+    ctx.song_svc
+        .create_song(ctx.make_create_req(artist1.id.clone()))
+        .await
+        .unwrap();
+    ctx.song_svc
+        .create_song(ctx.make_create_req(artist1.id.clone()))
+        .await
+        .unwrap();
+    ctx.song_svc
+        .create_song(ctx.make_create_req(artist2.id.clone()))
+        .await
+        .unwrap();
 
     let songs = ctx.song_svc.list_by_artist(&artist1.id).await.unwrap();
     assert_eq!(songs.len(), 2);
@@ -559,7 +646,10 @@ async fn test_service_list_by_label() {
     ctx.song_svc.create_song(req1).await.unwrap();
 
     // Song without label
-    ctx.song_svc.create_song(ctx.make_create_req(artist.id.clone())).await.unwrap();
+    ctx.song_svc
+        .create_song(ctx.make_create_req(artist.id.clone()))
+        .await
+        .unwrap();
 
     let songs = ctx.song_svc.list_by_label(&label.id).await.unwrap();
     assert_eq!(songs.len(), 1);
@@ -574,7 +664,11 @@ async fn test_service_update_song() {
     let ctx = TestContext::new().await;
     let artist = ctx.create_user("artist@example.com").await;
 
-    let song = ctx.song_svc.create_song(ctx.make_create_req(artist.id.clone())).await.unwrap();
+    let song = ctx
+        .song_svc
+        .create_song(ctx.make_create_req(artist.id.clone()))
+        .await
+        .unwrap();
 
     let updated = ctx
         .song_svc
@@ -604,7 +698,11 @@ async fn test_service_update_song_partial() {
     let ctx = TestContext::new().await;
     let artist = ctx.create_user("artist@example.com").await;
 
-    let song = ctx.song_svc.create_song(ctx.make_create_req(artist.id.clone())).await.unwrap();
+    let song = ctx
+        .song_svc
+        .create_song(ctx.make_create_req(artist.id.clone()))
+        .await
+        .unwrap();
 
     let updated = ctx
         .song_svc
@@ -653,7 +751,11 @@ async fn test_service_update_song_not_found() {
 async fn test_service_update_song_empty_title() {
     let ctx = TestContext::new().await;
     let artist = ctx.create_user("artist@example.com").await;
-    let song = ctx.song_svc.create_song(ctx.make_create_req(artist.id.clone())).await.unwrap();
+    let song = ctx
+        .song_svc
+        .create_song(ctx.make_create_req(artist.id.clone()))
+        .await
+        .unwrap();
 
     let err = ctx
         .song_svc
@@ -677,7 +779,11 @@ async fn test_service_update_song_empty_title() {
 async fn test_service_update_song_invalid_duration() {
     let ctx = TestContext::new().await;
     let artist = ctx.create_user("artist@example.com").await;
-    let song = ctx.song_svc.create_song(ctx.make_create_req(artist.id.clone())).await.unwrap();
+    let song = ctx
+        .song_svc
+        .create_song(ctx.make_create_req(artist.id.clone()))
+        .await
+        .unwrap();
 
     let err = ctx
         .song_svc
@@ -706,7 +812,11 @@ async fn test_service_delete_song() {
     let ctx = TestContext::new().await;
     let artist = ctx.create_user("artist@example.com").await;
 
-    let song = ctx.song_svc.create_song(ctx.make_create_req(artist.id.clone())).await.unwrap();
+    let song = ctx
+        .song_svc
+        .create_song(ctx.make_create_req(artist.id.clone()))
+        .await
+        .unwrap();
     ctx.song_svc.delete_song(&song.id).await.unwrap();
 
     let err = ctx.song_svc.get_song(&song.id).await.unwrap_err();
@@ -730,8 +840,14 @@ async fn test_delete_artist_cascades_songs() {
     let ctx = TestContext::new().await;
     let artist = ctx.create_user("artist@example.com").await;
 
-    ctx.song_svc.create_song(ctx.make_create_req(artist.id.clone())).await.unwrap();
-    ctx.song_svc.create_song(ctx.make_create_req(artist.id.clone())).await.unwrap();
+    ctx.song_svc
+        .create_song(ctx.make_create_req(artist.id.clone()))
+        .await
+        .unwrap();
+    ctx.song_svc
+        .create_song(ctx.make_create_req(artist.id.clone()))
+        .await
+        .unwrap();
 
     // Delete the artist
     ctx.user_repo.delete(&artist.id).await.unwrap();

@@ -3,13 +3,15 @@ mod common;
 use std::sync::Arc;
 use std::time::Duration;
 
+use actix_web::App;
 use actix_web::test as actix_test;
 use actix_web::web::Data;
-use actix_web::App;
 
-use backend::iam::auth::adapters::{JwtTokenService, PostgresSessionRepository, PostgresTokenRepository};
-use backend::iam::auth::api::configure as auth_routes;
 use backend::iam::auth::TokenService;
+use backend::iam::auth::adapters::{
+    JwtTokenService, PostgresSessionRepository, PostgresTokenRepository,
+};
+use backend::iam::auth::api::configure as auth_routes;
 use backend::iam::auth::{AuthConfig, AuthService, JWTConfig};
 use backend::iam::role::adapters::PostgresRoleRepository;
 use backend::iam::user::adapters::{BcryptPasswordService, PostgresUserRepository};
@@ -84,7 +86,8 @@ impl ApiTestContext {
 #[actix_web::test]
 async fn test_api_login_success() {
     let ctx = ApiTestContext::new().await;
-    ctx.create_active_user("api@example.com", "password123").await;
+    ctx.create_active_user("api@example.com", "password123")
+        .await;
 
     let app = actix_test::init_service(
         App::new()
@@ -146,7 +149,8 @@ async fn test_api_login_wrong_password() {
 #[actix_web::test]
 async fn test_api_refresh_success() {
     let ctx = ApiTestContext::new().await;
-    ctx.create_active_user("refresh@example.com", "password123").await;
+    ctx.create_active_user("refresh@example.com", "password123")
+        .await;
 
     let app = actix_test::init_service(
         App::new()
@@ -209,7 +213,8 @@ async fn test_api_refresh_invalid_token() {
 #[actix_web::test]
 async fn test_api_logout_success() {
     let ctx = ApiTestContext::new().await;
-    ctx.create_active_user("logout@example.com", "password123").await;
+    ctx.create_active_user("logout@example.com", "password123")
+        .await;
 
     let app = actix_test::init_service(
         App::new()
@@ -257,7 +262,8 @@ async fn test_api_logout_success() {
 #[actix_web::test]
 async fn test_api_me_authenticated() {
     let ctx = ApiTestContext::new().await;
-    ctx.create_active_user("me@example.com", "password123").await;
+    ctx.create_active_user("me@example.com", "password123")
+        .await;
 
     let app = actix_test::init_service(
         App::new()
@@ -305,9 +311,7 @@ async fn test_api_me_unauthenticated() {
     )
     .await;
 
-    let req = actix_test::TestRequest::get()
-        .uri("/auth/me")
-        .to_request();
+    let req = actix_test::TestRequest::get().uri("/auth/me").to_request();
 
     let resp = actix_test::call_service(&app, req).await;
     assert_eq!(resp.status(), 401);
@@ -320,7 +324,8 @@ async fn test_api_me_unauthenticated() {
 #[actix_web::test]
 async fn test_api_logout_all() {
     let ctx = ApiTestContext::new().await;
-    ctx.create_active_user("logall@example.com", "password123").await;
+    ctx.create_active_user("logall@example.com", "password123")
+        .await;
 
     let app = actix_test::init_service(
         App::new()
@@ -384,7 +389,8 @@ async fn test_api_logout_all() {
 #[actix_web::test]
 async fn test_api_list_and_revoke_sessions() {
     let ctx = ApiTestContext::new().await;
-    ctx.create_active_user("sess@example.com", "password123").await;
+    ctx.create_active_user("sess@example.com", "password123")
+        .await;
 
     let app = actix_test::init_service(
         App::new()
@@ -451,8 +457,10 @@ async fn test_api_list_and_revoke_sessions() {
 #[actix_web::test]
 async fn test_api_revoke_other_users_session_rejected() {
     let ctx = ApiTestContext::new().await;
-    ctx.create_active_user("user1@example.com", "password123").await;
-    ctx.create_active_user("user2@example.com", "password123").await;
+    ctx.create_active_user("user1@example.com", "password123")
+        .await;
+    ctx.create_active_user("user2@example.com", "password123")
+        .await;
 
     let app = actix_test::init_service(
         App::new()
@@ -491,7 +499,8 @@ async fn test_api_revoke_other_users_session_rejected() {
         .uri("/auth/sessions")
         .insert_header(("Authorization", format!("Bearer {token2}")))
         .to_request();
-    let sessions: Vec<serde_json::Value> = actix_test::read_body_json(actix_test::call_service(&app, req).await).await;
+    let sessions: Vec<serde_json::Value> =
+        actix_test::read_body_json(actix_test::call_service(&app, req).await).await;
     let user2_session_id = sessions[0]["id"].as_str().unwrap();
 
     // User1 tries to revoke user2's session — should fail
