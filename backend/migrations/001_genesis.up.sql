@@ -275,3 +275,29 @@ CREATE TRIGGER update_scenes_updated_at BEFORE UPDATE ON scenes
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 COMMENT ON TABLE scenes IS 'Segments of a movie where music tracks are placed';
+
+-- ============================================================================
+-- TRACKS  (song placement in a scene)
+-- ============================================================================
+
+CREATE TABLE tracks (
+    id           VARCHAR(255) PRIMARY KEY,
+    scene_id     VARCHAR(255) NOT NULL REFERENCES scenes(id) ON DELETE CASCADE,
+    song_id      VARCHAR(255) NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
+    usage_type   VARCHAR(50) NOT NULL,
+    created_by   VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    notes        TEXT,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT uq_track_scene_song UNIQUE (scene_id, song_id),
+    CONSTRAINT chk_track_usage_type CHECK (usage_type IN ('BACKGROUND', 'FEATURED', 'CREDITS', 'TRAILER'))
+);
+
+CREATE INDEX idx_tracks_scene_id ON tracks(scene_id);
+CREATE INDEX idx_tracks_song_id ON tracks(song_id);
+
+CREATE TRIGGER update_tracks_updated_at BEFORE UPDATE ON tracks
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+COMMENT ON TABLE tracks IS 'A song placement within a movie scene';
