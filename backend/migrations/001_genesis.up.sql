@@ -1,0 +1,137 @@
+-- ============================================================================
+-- EXTENSIONS
+-- ============================================================================
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ============================================================================
+-- HELPERS
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- ============================================================================
+-- USERS
+-- ============================================================================
+
+CREATE TABLE users (
+    id VARCHAR(255) PRIMARY KEY,
+    email VARCHAR(255) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    picture TEXT,
+
+    -- Auth: password OR OAuth (at least one set)
+    password_hash VARCHAR(255),
+    oauth_provider VARCHAR(50),
+    oauth_provider_id VARCHAR(255),
+
+    status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+    email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    last_login_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT uq_users_email UNIQUE (email),
+    CONSTRAINT chk_user_status CHECK (status IN ('ACTIVE', 'INACTIVE', 'SUSPENDED', 'PENDING')),
+    CONSTRAINT chk_oauth_provider CHECK (oauth_provider IS NULL OR oauth_provider IN ('GOOGLE', 'MICROSOFT')),
+    CONSTRAINT chk_has_auth_method CHECK (password_hash IS NOT NULL OR (oauth_provider IS NOT NULL AND oauth_provider_id IS NOT NULL))
+);
+
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_status ON users(status);
+CREATE INDEX idx_users_oauth_provider ON users(oauth_provider, oauth_provider_id);
+CREATE INDEX idx_users_created_at ON users(created_at);
+
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+COMMENT ON TABLE users IS 'Application users';
+
+-- ============================================================================
+-- ROLES
+-- ============================================================================
+
+CREATE TABLE roles (
+    id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    scopes TEXT[] NOT NULL DEFAULT '{}',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT uq_roles_name UNIQUE (name)
+);
+
+CREATE INDEX idx_roles_name ON roles(name);
+CREATE INDEX idx_roles_scopes ON roles USING GIN(scopes);
+
+CREATE TRIGGER update_roles_updated_at BEFORE UPDATE ON roles
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+COMMENT ON TABLE roles IS 'Named collections of scopes that can be assigned to users (like AWS IAM roles)';
+COMMENT ON COLUMN roles.scopes IS 'Array of permission scopes granted by this role';
+
+-- ============================================================================
+-- USER-ROLE ASSIGNMENTS
+-- ============================================================================
+
+CREATE TABLE user_roles (
+    user_id VARCHAR(255) NOT NULL,
+    role_id VARCHAR(255) NOT NULL,
+    assigned_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (user_id, role_id),
+    CONSTRAINT fk_user_roles_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_user_roles_role FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_user_roles_user_id ON user_roles(user_id);
+CREATE INDEX idx_user_roles_role_id ON user_roles(role_id);
+
+COMMENT ON TABLE user_roles IS 'Assignment of roles to users';
+
+-- ============================================================================
+-- USER SESSIONS — represents a login from a specific device/browser
+-- ============================================================================
+
+CREATE TABLE user_sessions (
+    id          VARCHAR(255) PRIMARY KEY,
+    user_id     VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    ip_address  TEXT NOT NULL DEFAULT '',
+    user_agent  TEXT NOT NULL DEFAULT '',
+    expires_at  TIMESTAMPTZ NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_activity TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_user_sessions_user_id ON user_sessions(user_id);
+CREATE INDEX idx_user_sessions_expires_at ON user_sessions(expires_at);
+
+COMMENT ON TABLE user_sessions IS 'Tracks active login sessions per device/browser';
+
+-- ============================================================================
+-- REFRESH TOKENS — belongs to a session, rotates within it
+-- ============================================================================
+
+CREATE TABLE refresh_tokens (
+    id          VARCHAR(255) PRIMARY KEY,
+    token       TEXT NOT NULL,
+    user_id     VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    session_id  VARCHAR(255) NOT NULL REFERENCES user_sessions(id) ON DELETE CASCADE,
+    expires_at  TIMESTAMPTZ NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    is_revoked  BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE INDEX idx_refresh_tokens_token ON refresh_tokens(token);
+CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+CREATE INDEX idx_refresh_tokens_session_id ON refresh_tokens(session_id);
+CREATE INDEX idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
+
+COMMENT ON TABLE refresh_tokens IS 'JWT refresh tokens, linked to a session for token rotation';
