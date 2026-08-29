@@ -230,3 +230,30 @@ CREATE TRIGGER update_movies_updated_at BEFORE UPDATE ON movies
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 COMMENT ON TABLE movies IS 'Movies that require music licensing for their scenes';
+
+-- ============================================================================
+-- SCENES
+-- ============================================================================
+
+CREATE TABLE scenes (
+    id           VARCHAR(255) PRIMARY KEY,
+    movie_id     VARCHAR(255) NOT NULL REFERENCES movies(id) ON DELETE CASCADE,
+    title        VARCHAR(500) NOT NULL,
+    scene_number INTEGER NOT NULL,
+    description  TEXT,
+    start_time   INTEGER NOT NULL,
+    end_time     INTEGER NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT chk_scene_times CHECK (end_time > start_time),
+    CONSTRAINT chk_scene_start_positive CHECK (start_time >= 0),
+    CONSTRAINT chk_scene_number_positive CHECK (scene_number >= 1)
+);
+
+CREATE INDEX idx_scenes_movie_id ON scenes(movie_id);
+
+CREATE TRIGGER update_scenes_updated_at BEFORE UPDATE ON scenes
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+COMMENT ON TABLE scenes IS 'Segments of a movie where music tracks are placed';
