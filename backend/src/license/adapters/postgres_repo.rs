@@ -139,6 +139,63 @@ impl LicenseRepository for PostgresLicenseRepository {
         Ok(())
     }
 
+    async fn save_with_offer(
+        &self,
+        license: &LicenseRequest,
+        offer: &LicenseOffer,
+    ) -> Result<(), AppError> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| AppError::internal(e.to_string()))?;
+
+        sqlx::query(&format!(
+            "INSERT INTO license_requests ({LICENSE_COLUMNS}) \
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)"
+        ))
+        .bind(license.id.as_str())
+        .bind(license.track_id.as_str())
+        .bind(license.status.as_str())
+        .bind(license.requested_by.as_str())
+        .bind(license.requested_at)
+        .bind(license.resolved_by.as_ref().map(|u| u.as_str()))
+        .bind(license.resolved_at)
+        .bind(&license.rejection_reason)
+        .bind(license.created_at)
+        .bind(license.updated_at)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
+
+        sqlx::query(&format!(
+            "INSERT INTO license_offers ({OFFER_COLUMNS}) \
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)"
+        ))
+        .bind(offer.id.as_str())
+        .bind(offer.license_request_id.as_str())
+        .bind(offer.offer_number)
+        .bind(offer.side.as_str())
+        .bind(offer.proposed_by.as_str())
+        .bind(offer.license_fee)
+        .bind(&offer.currency)
+        .bind(&offer.territory)
+        .bind(&offer.media_rights)
+        .bind(offer.license_start)
+        .bind(offer.license_end)
+        .bind(offer.exclusive)
+        .bind(&offer.notes)
+        .bind(offer.created_at)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
+
+        tx.commit()
+            .await
+            .map_err(|e| AppError::internal(e.to_string()))?;
+        Ok(())
+    }
+
     async fn get_by_id(&self, id: &LicenseRequestId) -> Result<Option<LicenseRequest>, AppError> {
         let row = sqlx::query(&format!(
             "SELECT {LICENSE_COLUMNS} FROM license_requests WHERE id = $1"

@@ -231,16 +231,17 @@ impl LicenseService {
         }
 
         let license = LicenseRequest::new(req.track_id.clone(), created_by.clone());
-        self.license_repo.save(&license).await?;
 
-        let offer = self
-            .next_offer(
-                &license.id,
-                NegotiationSide::MovieTeam,
-                created_by,
-                &req.terms,
-            )
-            .await?;
+        // Persisted atomically: a request must never exist without its
+        // initial offer.
+        let mut offer = LicenseOffer::new(
+            license.id.clone(),
+            1,
+            NegotiationSide::MovieTeam,
+            created_by,
+        );
+        Self::apply_terms(&mut offer, &req.terms);
+        self.license_repo.save_with_offer(&license, &offer).await?;
 
         Ok((license, offer))
     }
@@ -425,6 +426,15 @@ mod tests {
             self.licenses.lock().await.push(license.clone());
             Ok(())
         }
+        async fn save_with_offer(
+            &self,
+            license: &LicenseRequest,
+            offer: &LicenseOffer,
+        ) -> Result<(), AppError> {
+            self.licenses.lock().await.push(license.clone());
+            self.offers.lock().await.push(offer.clone());
+            Ok(())
+        }
         async fn get_by_id(
             &self,
             id: &LicenseRequestId,
@@ -573,6 +583,9 @@ mod tests {
     #[async_trait::async_trait]
     impl MovieRepository for MockMovieRepo {
         async fn save(&self, _: &Movie) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn save_with_owner(&self, _: &Movie, _: &MovieMember) -> Result<(), AppError> {
             Ok(())
         }
         async fn get_by_id(&self, _: &MovieId) -> Result<Option<Movie>, AppError> {

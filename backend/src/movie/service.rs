@@ -43,16 +43,17 @@ impl MovieService {
         movie.release_year = req.release_year;
         movie.director = req.director;
 
-        self.movie_repo.save(&movie).await?;
-
-        // Auto-add creator as Owner
+        // Creator becomes Owner; persisted atomically with the movie so a
+        // movie can never exist without an owner.
         let owner_member = MovieMember {
             movie_id: movie.id.clone(),
             user_id: movie.created_by.clone(),
             role: MovieRole::Owner,
             joined_at: movie.created_at,
         };
-        self.movie_repo.add_member(&owner_member).await?;
+        self.movie_repo
+            .save_with_owner(&movie, &owner_member)
+            .await?;
 
         Ok(movie)
     }
@@ -206,6 +207,15 @@ mod tests {
     impl MovieRepository for MockMovieRepo {
         async fn save(&self, movie: &Movie) -> Result<(), AppError> {
             self.movies.lock().await.push(movie.clone());
+            Ok(())
+        }
+        async fn save_with_owner(
+            &self,
+            movie: &Movie,
+            owner: &MovieMember,
+        ) -> Result<(), AppError> {
+            self.movies.lock().await.push(movie.clone());
+            self.members.lock().await.push(owner.clone());
             Ok(())
         }
         async fn get_by_id(&self, id: &MovieId) -> Result<Option<Movie>, AppError> {

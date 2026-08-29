@@ -166,21 +166,19 @@ impl AuthService {
     // Logout
     // ========================================================================
 
-    /// Logout a single session — revokes the session and all its refresh tokens
+    /// Logout a single session — deleting the session cascades to its
+    /// refresh tokens (FK ON DELETE CASCADE), so this is atomic.
     pub async fn logout(&self, refresh_token: &str) -> Result<(), AppError> {
         // Find the token to get its session_id
         if let Some(stored) = self.token_repo.get_refresh_token(refresh_token).await? {
-            self.token_repo
-                .revoke_by_session(&stored.session_id)
-                .await?;
             self.session_repo.revoke(&stored.session_id).await?;
         }
         Ok(())
     }
 
-    /// Logout all sessions — revokes all tokens and sessions for the user
+    /// Logout all sessions — deleting the sessions cascades to all their
+    /// refresh tokens (FK ON DELETE CASCADE), so this is atomic.
     pub async fn logout_all(&self, user_id: &UserId) -> Result<(), AppError> {
-        self.token_repo.revoke_all_for_user(user_id).await?;
         self.session_repo.revoke_all_for_user(user_id).await
     }
 
@@ -192,9 +190,9 @@ impl AuthService {
         self.session_repo.list_by_user(user_id).await
     }
 
-    /// Revoke a specific session by ID — also revokes all its refresh tokens
+    /// Revoke a specific session by ID — deleting it cascades to its
+    /// refresh tokens (FK ON DELETE CASCADE), so this is atomic.
     pub async fn revoke_session(&self, session_id: &str) -> Result<(), AppError> {
-        self.token_repo.revoke_by_session(session_id).await?;
         self.session_repo.revoke(session_id).await
     }
 

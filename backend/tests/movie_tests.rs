@@ -524,6 +524,49 @@ async fn test_service_create_movie_auto_adds_owner() {
 }
 
 #[tokio::test]
+async fn test_repo_save_with_owner_atomic() {
+    let ctx = TestContext::new().await;
+    let user = ctx.create_user("user@example.com").await;
+
+    let movie = backend::movie::Movie::new("Atomic".into(), user.id.clone());
+    let owner = backend::movie::MovieMember {
+        movie_id: movie.id.clone(),
+        user_id: user.id.clone(),
+        role: MovieRole::Owner,
+        joined_at: movie.created_at,
+    };
+    ctx.movie_repo
+        .save_with_owner(&movie, &owner)
+        .await
+        .unwrap();
+
+    assert!(ctx.movie_repo.get_by_id(&movie.id).await.unwrap().is_some());
+    let members = ctx.movie_repo.list_members(&movie.id).await.unwrap();
+    assert_eq!(members.len(), 1);
+    assert_eq!(members[0].role, MovieRole::Owner);
+}
+
+#[tokio::test]
+async fn test_repo_save_with_owner_rolls_back_on_member_failure() {
+    let ctx = TestContext::new().await;
+    let user = ctx.create_user("user@example.com").await;
+
+    let movie = backend::movie::Movie::new("Rollback".into(), user.id.clone());
+    // Nonexistent user -> FK violation on the member insert, inside the tx.
+    let bad_owner = backend::movie::MovieMember {
+        movie_id: movie.id.clone(),
+        user_id: UserId::new(),
+        role: MovieRole::Owner,
+        joined_at: movie.created_at,
+    };
+    let result = ctx.movie_repo.save_with_owner(&movie, &bad_owner).await;
+    assert!(result.is_err());
+
+    // The movie insert must have been rolled back too — no orphan movie.
+    assert!(ctx.movie_repo.get_by_id(&movie.id).await.unwrap().is_none());
+}
+
+#[tokio::test]
 async fn test_service_add_member() {
     let ctx = TestContext::new().await;
     let owner = ctx.create_user("owner@example.com").await;
