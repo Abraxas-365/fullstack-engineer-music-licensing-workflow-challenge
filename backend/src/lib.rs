@@ -5,3 +5,4 @@ pub mod label;
 pub mod movie;
 pub mod scene;
 pub mod song;
+pub mod track;

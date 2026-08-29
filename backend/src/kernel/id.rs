@@ -36,3 +36,4 @@ define_id!(LabelId);
 define_id!(SongId);
 define_id!(MovieId);
 define_id!(SceneId);
+define_id!(TrackId);
