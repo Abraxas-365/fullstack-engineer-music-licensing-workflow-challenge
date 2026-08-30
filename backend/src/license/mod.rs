@@ -1,5 +1,6 @@
 pub mod adapters;
 pub mod api;
+pub mod container;
 mod error;
 mod model;
 mod port;
