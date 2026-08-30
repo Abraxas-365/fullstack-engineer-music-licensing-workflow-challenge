@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::error::AppError;
 use crate::kernel::{LicenseOfferId, LicenseRequestId, TrackId, UserId};
@@ -9,7 +10,7 @@ use crate::kernel::{LicenseOfferId, LicenseRequestId, TrackId, UserId};
 // ============================================================================
 
 /// Domain event emitted after a license negotiation action completes.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct LicenseEvent {
     pub license_id: LicenseRequestId,
     pub track_id: TrackId,
@@ -18,7 +19,7 @@ pub struct LicenseEvent {
     pub timestamp: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LicenseEventKind {
     Submitted,
@@ -32,7 +33,7 @@ pub enum LicenseEventKind {
 // Enums
 // ============================================================================
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum LicenseStatus {
     /// Movie team is preparing the request privately.
     Draft,
@@ -75,7 +76,7 @@ impl TryFrom<&str> for LicenseStatus {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum NegotiationSide {
     MovieTeam,
     RightsHolder,
@@ -201,7 +202,7 @@ impl LicenseOffer {
 // DTOs
 // ============================================================================
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct OfferTerms {
     pub license_fee: Option<f64>,
     pub currency: Option<String>,
@@ -213,10 +214,11 @@ pub struct OfferTerms {
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateLicenseRequest {
     pub track_id: TrackId,
     #[serde(flatten)]
+    #[schema(inline)]
     pub terms: OfferTerms,
 }
 
@@ -224,7 +226,7 @@ pub struct CreateLicenseRequest {
 // Responses
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct LicenseRequestResponse {
     pub id: LicenseRequestId,
     pub track_id: TrackId,
@@ -255,7 +257,7 @@ impl From<LicenseRequest> for LicenseRequestResponse {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct LicenseOfferResponse {
     pub id: LicenseOfferId,
     pub license_request_id: LicenseRequestId,

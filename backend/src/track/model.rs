@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::error::AppError;
 use crate::kernel::{SceneId, SongId, TrackId, UserId};
@@ -8,7 +9,7 @@ use crate::kernel::{SceneId, SongId, TrackId, UserId};
 // Entity
 // ============================================================================
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum UsageType {
     Background,
     Featured,
@@ -78,7 +79,7 @@ impl Track {
 // DTOs
 // ============================================================================
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateTrackRequest {
     pub scene_id: SceneId,
     pub song_id: SongId,
@@ -92,7 +93,7 @@ impl CreateTrackRequest {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateTrackRequest {
     pub usage_type: Option<String>,
     pub notes: Option<String>,
@@ -107,7 +108,7 @@ impl UpdateTrackRequest {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct TrackResponse {
     pub id: TrackId,
     pub scene_id: SceneId,

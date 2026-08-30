@@ -3,6 +3,7 @@ use serde::Deserialize;
 use tokio::sync::broadcast;
 use tokio_stream::StreamExt;
 use tokio_stream::wrappers::BroadcastStream;
+use utoipa::ToSchema;
 
 use crate::error::AppError;
 use crate::iam::auth::AuthContext;
@@ -18,16 +19,41 @@ use super::service::LicenseService;
 // Request bodies
 // ============================================================================
 
-#[derive(Debug, Deserialize)]
-struct RejectBody {
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct RejectBody {
     reason: String,
+}
+
+#[derive(Debug, serde::Serialize, ToSchema)]
+struct CreateLicenseResponseBody {
+    license: LicenseRequestResponse,
+    offer: LicenseOfferResponse,
 }
 
 // ============================================================================
 // Handlers
 // ============================================================================
 
-async fn create_license(
+/// Create a license request
+///
+/// Creates a new license request (in `DRAFT` status) for a track, along with
+/// its initial offer terms. The request must be submitted separately before
+/// the rights holder can see it.
+#[utoipa::path(
+    post,
+    path = "/api/licenses",
+    tag = "Licenses",
+    security(("bearer_auth" = [])),
+    request_body = CreateLicenseRequest,
+    responses(
+        (status = 201, description = "License request created", body = CreateLicenseResponseBody),
+        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Track not found", body = crate::error::ErrorResponse),
+        (status = 409, description = "A license request already exists for this track", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn create_license(
     auth: AuthContext,
     svc: web::Data<LicenseService>,
     body: web::Json<CreateLicenseRequest>,
@@ -40,7 +66,20 @@ async fn create_license(
     })))
 }
 
-async fn get_license(
+/// Get a license request
+#[utoipa::path(
+    get,
+    path = "/api/licenses/{id}",
+    tag = "Licenses",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "License request id")),
+    responses(
+        (status = 200, description = "License request", body = LicenseRequestResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "License request not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn get_license(
     auth: AuthContext,
     svc: web::Data<LicenseService>,
     path: web::Path<String>,
@@ -52,7 +91,22 @@ async fn get_license(
     Ok(HttpResponse::Ok().json(LicenseRequestResponse::from(license)))
 }
 
-async fn list_offers(
+/// List offers for a license request
+///
+/// Returns the full negotiation history, ordered by offer number.
+#[utoipa::path(
+    get,
+    path = "/api/licenses/{id}/offers",
+    tag = "Licenses",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "License request id")),
+    responses(
+        (status = 200, description = "Offer history", body = Vec<LicenseOfferResponse>),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "License request not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn list_offers(
     auth: AuthContext,
     svc: web::Data<LicenseService>,
     path: web::Path<String>,
@@ -66,7 +120,24 @@ async fn list_offers(
     Ok(HttpResponse::Ok().json(res))
 }
 
-async fn revise_draft(
+/// Revise a draft's terms
+///
+/// Only available while the request is still in `DRAFT` status.
+#[utoipa::path(
+    post,
+    path = "/api/licenses/{id}/revise",
+    tag = "Licenses",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "License request id")),
+    request_body = OfferTerms,
+    responses(
+        (status = 200, description = "Draft offer updated", body = LicenseOfferResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "License request not found", body = crate::error::ErrorResponse),
+        (status = 422, description = "License request is not a draft", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn revise_draft(
     auth: AuthContext,
     svc: web::Data<LicenseService>,
     path: web::Path<String>,
@@ -83,7 +154,24 @@ async fn revise_draft(
     Ok(HttpResponse::Ok().json(LicenseOfferResponse::from(offer)))
 }
 
-async fn submit(
+/// Submit a draft license request
+///
+/// Moves the request from `DRAFT` to `REQUESTED`, making it visible to the
+/// rights holder and emitting a `submitted` SSE event.
+#[utoipa::path(
+    post,
+    path = "/api/licenses/{id}/submit",
+    tag = "Licenses",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "License request id")),
+    responses(
+        (status = 200, description = "License request submitted", body = LicenseRequestResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "License request not found", body = crate::error::ErrorResponse),
+        (status = 422, description = "License request is not a draft", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn submit(
     auth: AuthContext,
     svc: web::Data<LicenseService>,
     path: web::Path<String>,
@@ -98,7 +186,25 @@ async fn submit(
     Ok(HttpResponse::Ok().json(LicenseRequestResponse::from(license)))
 }
 
-async fn counter_offer(
+/// Counter the latest offer
+///
+/// Only the side that does not own the latest offer may counter it. Emits a
+/// `counter_offer` SSE event.
+#[utoipa::path(
+    post,
+    path = "/api/licenses/{id}/counter",
+    tag = "Licenses",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "License request id")),
+    request_body = OfferTerms,
+    responses(
+        (status = 200, description = "Counter-offer created", body = LicenseOfferResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "License request not found", body = crate::error::ErrorResponse),
+        (status = 422, description = "Cannot counter own offer or license is not negotiable", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn counter_offer(
     auth: AuthContext,
     svc: web::Data<LicenseService>,
     path: web::Path<String>,
@@ -115,7 +221,23 @@ async fn counter_offer(
     Ok(HttpResponse::Ok().json(LicenseOfferResponse::from(offer)))
 }
 
-async fn accept(
+/// Accept the latest offer
+///
+/// Resolves the negotiation as `APPROVED`. Emits an `accepted` SSE event.
+#[utoipa::path(
+    post,
+    path = "/api/licenses/{id}/accept",
+    tag = "Licenses",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "License request id")),
+    responses(
+        (status = 200, description = "License request approved", body = LicenseRequestResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "License request not found", body = crate::error::ErrorResponse),
+        (status = 422, description = "License request cannot be accepted in its current state", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn accept(
     auth: AuthContext,
     svc: web::Data<LicenseService>,
     path: web::Path<String>,
@@ -130,7 +252,24 @@ async fn accept(
     Ok(HttpResponse::Ok().json(LicenseRequestResponse::from(license)))
 }
 
-async fn reject(
+/// Reject the latest offer
+///
+/// Resolves the negotiation as `REJECTED`. Emits a `rejected` SSE event.
+#[utoipa::path(
+    post,
+    path = "/api/licenses/{id}/reject",
+    tag = "Licenses",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "License request id")),
+    request_body = RejectBody,
+    responses(
+        (status = 200, description = "License request rejected", body = LicenseRequestResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "License request not found", body = crate::error::ErrorResponse),
+        (status = 422, description = "License request cannot be rejected in its current state", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn reject(
     auth: AuthContext,
     svc: web::Data<LicenseService>,
     path: web::Path<String>,
@@ -147,7 +286,24 @@ async fn reject(
     Ok(HttpResponse::Ok().json(LicenseRequestResponse::from(license)))
 }
 
-async fn cancel(
+/// Cancel a license request
+///
+/// Withdraws the request. Only the movie team may cancel. Emits a
+/// `cancelled` SSE event.
+#[utoipa::path(
+    post,
+    path = "/api/licenses/{id}/cancel",
+    tag = "Licenses",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "License request id")),
+    responses(
+        (status = 200, description = "License request cancelled", body = LicenseRequestResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "License request not found", body = crate::error::ErrorResponse),
+        (status = 422, description = "License request cannot be cancelled in its current state", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn cancel(
     auth: AuthContext,
     svc: web::Data<LicenseService>,
     path: web::Path<String>,
@@ -162,7 +318,23 @@ async fn cancel(
     Ok(HttpResponse::Ok().json(LicenseRequestResponse::from(license)))
 }
 
-async fn delete_license(
+/// Delete a draft license request
+///
+/// Only drafts may be deleted; submitted requests must be cancelled instead.
+#[utoipa::path(
+    delete,
+    path = "/api/licenses/{id}",
+    tag = "Licenses",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "License request id")),
+    responses(
+        (status = 204, description = "License request deleted"),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "License request not found", body = crate::error::ErrorResponse),
+        (status = 422, description = "Only drafts can be deleted", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn delete_license(
     auth: AuthContext,
     svc: web::Data<LicenseService>,
     path: web::Path<String>,
@@ -176,11 +348,22 @@ async fn delete_license(
     Ok(HttpResponse::NoContent().finish())
 }
 
-/// SSE endpoint — streams license negotiation events to the connected client.
+/// Stream negotiation events (SSE)
 ///
-/// The client receives lightweight JSON events; it should call the REST API
-/// to fetch full details when needed.
-async fn events(_auth: AuthContext, svc: web::Data<LicenseService>) -> HttpResponse {
+/// Streams license negotiation events (submitted / counter-offer / accepted
+/// / rejected / cancelled) as `text/event-stream`. The client should call
+/// the REST API to fetch full details when an event arrives.
+#[utoipa::path(
+    get,
+    path = "/api/licenses/events",
+    tag = "Licenses",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "SSE stream of LicenseEvent objects", body = LicenseEvent, content_type = "text/event-stream"),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn events(_auth: AuthContext, svc: web::Data<LicenseService>) -> HttpResponse {
     let rx: broadcast::Receiver<LicenseEvent> = svc.subscribe();
     let stream = BroadcastStream::new(rx).filter_map(|result| match result {
         Ok(event) => {

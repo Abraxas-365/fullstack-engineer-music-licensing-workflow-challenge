@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::error::AppError;
 use crate::kernel::{LabelId, UserId};
@@ -36,7 +37,7 @@ impl Label {
 // Label Membership
 // ============================================================================
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum LabelRole {
     Owner,
     Rep,
@@ -78,7 +79,7 @@ pub struct LabelMember {
 // DTOs
 // ============================================================================
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateLabelRequest {
     pub name: String,
     pub website: Option<String>,
@@ -97,7 +98,7 @@ impl CreateLabelRequest {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateLabelRequest {
     pub name: Option<String>,
     pub website: Option<String>,
@@ -116,7 +117,7 @@ impl UpdateLabelRequest {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct LabelResponse {
     pub id: LabelId,
     pub name: String,
@@ -139,7 +140,7 @@ impl From<&Label> for LabelResponse {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct LabelMemberResponse {
     pub user_id: UserId,
     pub role: String,
@@ -156,7 +157,7 @@ impl From<&LabelMember> for LabelMemberResponse {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct AddMemberRequest {
     pub user_id: UserId,
     pub role: Option<String>,

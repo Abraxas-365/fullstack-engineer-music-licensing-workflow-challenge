@@ -4,6 +4,7 @@ use actix_web::HttpResponse;
 use actix_web::ResponseError;
 use actix_web::http::StatusCode;
 use serde::Serialize;
+use utoipa::ToSchema;
 
 use super::ErrorType;
 
@@ -17,13 +18,15 @@ pub struct AppError {
     pub details: HashMap<String, serde_json::Value>,
 }
 
-#[derive(Serialize)]
-struct ErrorResponse {
-    code: String,
-    message: String,
-    error_type: ErrorType,
+/// Standard error body returned by every failing endpoint.
+#[derive(Serialize, ToSchema)]
+pub struct ErrorResponse {
+    pub code: String,
+    pub message: String,
+    pub error_type: ErrorType,
     #[serde(skip_serializing_if = "HashMap::is_empty")]
-    details: HashMap<String, serde_json::Value>,
+    #[schema(value_type = Object)]
+    pub details: HashMap<String, serde_json::Value>,
 }
 
 impl AppError {

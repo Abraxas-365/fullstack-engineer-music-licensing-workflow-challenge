@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::error::AppError;
 use crate::kernel::{MovieId, SceneId};
@@ -52,7 +53,7 @@ impl Scene {
 // DTOs
 // ============================================================================
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateSceneRequest {
     pub movie_id: MovieId,
     pub title: String,
@@ -85,7 +86,7 @@ impl CreateSceneRequest {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateSceneRequest {
     pub title: Option<String>,
     pub scene_number: Option<i32>,
@@ -119,7 +120,7 @@ impl UpdateSceneRequest {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct SceneResponse {
     pub id: SceneId,
     pub movie_id: MovieId,
