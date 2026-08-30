@@ -5,6 +5,30 @@ use crate::error::AppError;
 use crate::kernel::{LicenseOfferId, LicenseRequestId, TrackId, UserId};
 
 // ============================================================================
+// Events
+// ============================================================================
+
+/// Domain event emitted after a license negotiation action completes.
+#[derive(Debug, Clone, Serialize)]
+pub struct LicenseEvent {
+    pub license_id: LicenseRequestId,
+    pub track_id: TrackId,
+    pub kind: LicenseEventKind,
+    pub actor: UserId,
+    pub timestamp: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LicenseEventKind {
+    Submitted,
+    CounterOffer,
+    Accepted,
+    Rejected,
+    Cancelled,
+}
+
+// ============================================================================
 // Enums
 // ============================================================================
 

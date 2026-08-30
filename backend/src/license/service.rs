@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use chrono::Utc;
+use tokio::sync::broadcast;
 
 use crate::error::AppError;
 use crate::kernel::{LicenseRequestId, TrackId, UserId};
@@ -12,7 +13,8 @@ use crate::track::TrackRepository;
 
 use super::error::LicenseError;
 use super::model::{
-    CreateLicenseRequest, LicenseOffer, LicenseRequest, LicenseStatus, NegotiationSide, OfferTerms,
+    CreateLicenseRequest, LicenseEvent, LicenseEventKind, LicenseOffer, LicenseRequest,
+    LicenseStatus, NegotiationSide, OfferTerms,
 };
 use super::port::LicenseRepository;
 
@@ -33,6 +35,7 @@ pub struct LicenseService {
     movie_repo: Arc<dyn MovieRepository>,
     song_repo: Arc<dyn SongRepository>,
     label_repo: Arc<dyn LabelRepository>,
+    events_tx: broadcast::Sender<LicenseEvent>,
 }
 
 impl LicenseService {
@@ -43,6 +46,7 @@ impl LicenseService {
         movie_repo: Arc<dyn MovieRepository>,
         song_repo: Arc<dyn SongRepository>,
         label_repo: Arc<dyn LabelRepository>,
+        events_tx: broadcast::Sender<LicenseEvent>,
     ) -> Self {
         Self {
             license_repo,
@@ -51,7 +55,25 @@ impl LicenseService {
             movie_repo,
             song_repo,
             label_repo,
+            events_tx,
         }
+    }
+
+    /// Subscribe to license events (used by the SSE endpoint).
+    pub fn subscribe(&self) -> broadcast::Receiver<LicenseEvent> {
+        self.events_tx.subscribe()
+    }
+
+    fn emit(&self, license: &LicenseRequest, kind: LicenseEventKind, actor: &UserId) {
+        let event = LicenseEvent {
+            license_id: license.id.clone(),
+            track_id: license.track_id.clone(),
+            kind,
+            actor: actor.clone(),
+            timestamp: Utc::now(),
+        };
+        // Ignore send error — it just means no subscribers are listening.
+        let _ = self.events_tx.send(event);
     }
 
     // ========================================================================
@@ -277,6 +299,7 @@ impl LicenseService {
         license.status = LicenseStatus::Requested;
         license.updated_at = Utc::now();
         self.license_repo.update(&license).await?;
+        self.emit(&license, LicenseEventKind::Submitted, &actor);
         Ok(license)
     }
 
@@ -295,7 +318,11 @@ impl LicenseService {
             ));
         }
         let (side, _) = self.assert_can_respond(&license, &actor).await?;
-        self.next_offer(&license.id, side, actor, &terms).await
+        let offer = self
+            .next_offer(&license.id, side, actor.clone(), &terms)
+            .await?;
+        self.emit(&license, LicenseEventKind::CounterOffer, &actor);
+        Ok(offer)
     }
 
     /// Accept the latest offer. Only the side that received it can accept —
@@ -309,10 +336,11 @@ impl LicenseService {
         Self::assert_transition(&license.status, &LicenseStatus::Approved)?;
         self.assert_can_respond(&license, &actor).await?;
         license.status = LicenseStatus::Approved;
-        license.resolved_by = Some(actor);
+        license.resolved_by = Some(actor.clone());
         license.resolved_at = Some(Utc::now());
         license.updated_at = Utc::now();
         self.license_repo.update(&license).await?;
+        self.emit(&license, LicenseEventKind::Accepted, &actor);
         Ok(license)
     }
 
@@ -328,11 +356,12 @@ impl LicenseService {
         Self::assert_transition(&license.status, &LicenseStatus::Rejected)?;
         self.assert_can_respond(&license, &actor).await?;
         license.status = LicenseStatus::Rejected;
-        license.resolved_by = Some(actor);
+        license.resolved_by = Some(actor.clone());
         license.resolved_at = Some(Utc::now());
         license.rejection_reason = Some(reason);
         license.updated_at = Utc::now();
         self.license_repo.update(&license).await?;
+        self.emit(&license, LicenseEventKind::Rejected, &actor);
         Ok(license)
     }
 
@@ -346,10 +375,11 @@ impl LicenseService {
         self.assert_movie_team(&license.track_id, &actor).await?;
         Self::assert_transition(&license.status, &LicenseStatus::Cancelled)?;
         license.status = LicenseStatus::Cancelled;
-        license.resolved_by = Some(actor);
+        license.resolved_by = Some(actor.clone());
         license.resolved_at = Some(Utc::now());
         license.updated_at = Utc::now();
         self.license_repo.update(&license).await?;
+        self.emit(&license, LicenseEventKind::Cancelled, &actor);
         Ok(license)
     }
 
@@ -805,6 +835,7 @@ mod tests {
                 Arc::new(MockLabelRepo {
                     members: Mutex::new(label_members),
                 }),
+                broadcast::channel(16).0,
             );
 
             Self {

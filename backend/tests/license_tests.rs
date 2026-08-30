@@ -20,6 +20,7 @@ use backend::song::adapters::PostgresSongRepository;
 use backend::song::{Song, SongRepository};
 use backend::track::adapters::PostgresTrackRepository;
 use backend::track::{Track, TrackRepository, UsageType};
+use tokio::sync::broadcast;
 
 use common::TestDb;
 
@@ -54,6 +55,7 @@ impl TestContext {
             movie_repo.clone(),
             song_repo.clone(),
             label_repo.clone(),
+            broadcast::channel(16).0,
         );
 
         Self {
