@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::error::AppError;
 use crate::kernel::{MovieId, UserId};
@@ -40,7 +41,7 @@ impl Movie {
 // Movie Membership
 // ============================================================================
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum MovieRole {
     Owner,
     Supervisor,
@@ -85,7 +86,7 @@ pub struct MovieMember {
 // DTOs
 // ============================================================================
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateMovieRequest {
     pub title: String,
     pub description: Option<String>,
@@ -110,7 +111,7 @@ impl CreateMovieRequest {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateMovieRequest {
     pub title: Option<String>,
     pub description: Option<String>,
@@ -139,7 +140,7 @@ impl UpdateMovieRequest {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct MovieResponse {
     pub id: MovieId,
     pub title: String,
@@ -172,7 +173,7 @@ pub struct MovieFilter {
     pub created_by: Option<UserId>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct MovieMemberResponse {
     pub user_id: UserId,
     pub role: String,
@@ -189,7 +190,7 @@ impl From<&MovieMember> for MovieMemberResponse {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct AddMovieMemberRequest {
     pub user_id: UserId,
     pub role: Option<String>,

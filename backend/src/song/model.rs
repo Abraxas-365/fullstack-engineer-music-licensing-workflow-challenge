@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::kernel::{LabelId, SongId, UserId};
 
@@ -53,7 +54,7 @@ impl Song {
 // DTOs
 // ============================================================================
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateSongRequest {
     pub title: String,
     pub artist_id: UserId,
@@ -80,7 +81,7 @@ impl CreateSongRequest {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateSongRequest {
     pub title: Option<String>,
     pub album: Option<String>,
@@ -109,7 +110,7 @@ impl UpdateSongRequest {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct SongResponse {
     pub id: SongId,
     pub title: String,

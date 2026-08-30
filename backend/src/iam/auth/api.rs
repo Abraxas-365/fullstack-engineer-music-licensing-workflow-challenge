@@ -1,6 +1,7 @@
 use actix_web::{HttpRequest, HttpResponse, web};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::error::AppError;
 
@@ -12,23 +13,23 @@ use super::service::AuthService;
 // Request / Response DTOs
 // ============================================================================
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct LoginBody {
     pub email: String,
     pub password: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct RefreshBody {
     pub refresh_token: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct LogoutBody {
     pub refresh_token: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct TokenResponse {
     pub access_token: String,
     pub refresh_token: String,
@@ -36,7 +37,7 @@ pub struct TokenResponse {
     pub expires_in: i64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct MeResponse {
     pub user_id: String,
     pub email: String,
@@ -44,7 +45,7 @@ pub struct MeResponse {
     pub scopes: Vec<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct SessionResponse {
     pub id: String,
     pub ip_address: String,
@@ -54,7 +55,7 @@ pub struct SessionResponse {
     pub expires_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct MessageResponse {
     pub message: String,
 }
@@ -83,6 +84,18 @@ fn extract_meta(req: &HttpRequest) -> LoginMetadata {
     }
 }
 
+/// Log in with email and password
+#[utoipa::path(
+    post,
+    path = "/api/auth/login",
+    tag = "Auth",
+    request_body = LoginBody,
+    responses(
+        (status = 200, description = "Login successful", body = TokenResponse),
+        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
+        (status = 401, description = "Invalid credentials", body = crate::error::ErrorResponse),
+    )
+)]
 pub async fn login(
     req: HttpRequest,
     auth_svc: web::Data<AuthService>,
@@ -109,6 +122,17 @@ pub async fn login(
     }))
 }
 
+/// Refresh an access token
+#[utoipa::path(
+    post,
+    path = "/api/auth/refresh",
+    tag = "Auth",
+    request_body = RefreshBody,
+    responses(
+        (status = 200, description = "Tokens refreshed", body = TokenResponse),
+        (status = 401, description = "Invalid or expired refresh token", body = crate::error::ErrorResponse),
+    )
+)]
 pub async fn refresh(
     auth_svc: web::Data<AuthService>,
     body: web::Json<RefreshBody>,
@@ -123,6 +147,16 @@ pub async fn refresh(
     }))
 }
 
+/// Log out (revoke a single refresh token)
+#[utoipa::path(
+    post,
+    path = "/api/auth/logout",
+    tag = "Auth",
+    request_body = LogoutBody,
+    responses(
+        (status = 200, description = "Logged out", body = MessageResponse),
+    )
+)]
 pub async fn logout(
     auth_svc: web::Data<AuthService>,
     body: web::Json<LogoutBody>,
@@ -134,6 +168,17 @@ pub async fn logout(
     }))
 }
 
+/// Log out of all sessions (revoke all refresh tokens)
+#[utoipa::path(
+    post,
+    path = "/api/auth/logout-all",
+    tag = "Auth",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "All sessions revoked", body = MessageResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+    )
+)]
 pub async fn logout_all(
     auth: AuthContext,
     auth_svc: web::Data<AuthService>,
@@ -145,6 +190,17 @@ pub async fn logout_all(
     }))
 }
 
+/// Get the authenticated user's profile
+#[utoipa::path(
+    get,
+    path = "/api/auth/me",
+    tag = "Auth",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Current user", body = MeResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+    )
+)]
 pub async fn me(auth: AuthContext) -> Result<HttpResponse, AppError> {
     Ok(HttpResponse::Ok().json(MeResponse {
         user_id: auth.user_id.to_string(),
@@ -154,6 +210,17 @@ pub async fn me(auth: AuthContext) -> Result<HttpResponse, AppError> {
     }))
 }
 
+/// List active sessions for the authenticated user
+#[utoipa::path(
+    get,
+    path = "/api/auth/sessions",
+    tag = "Auth",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Active sessions", body = Vec<SessionResponse>),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+    )
+)]
 pub async fn list_sessions(
     auth: AuthContext,
     auth_svc: web::Data<AuthService>,
@@ -175,6 +242,19 @@ pub async fn list_sessions(
     Ok(HttpResponse::Ok().json(response))
 }
 
+/// Revoke a specific session
+#[utoipa::path(
+    delete,
+    path = "/api/auth/sessions/{id}",
+    tag = "Auth",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "Session id")),
+    responses(
+        (status = 200, description = "Session revoked", body = MessageResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Session not found", body = crate::error::ErrorResponse),
+    )
+)]
 pub async fn revoke_session(
     auth: AuthContext,
     auth_svc: web::Data<AuthService>,

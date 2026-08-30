@@ -3,12 +3,15 @@ use std::time::Duration;
 use actix_cors::Cors;
 use actix_web::{App, HttpServer, middleware, web};
 use sqlx::postgres::PgPoolOptions;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 use backend::iam::auth::{AuthConfig, JWTConfig};
 use backend::iam::container::IamContainer;
 use backend::label::container::LabelContainer;
 use backend::license::container::LicenseContainer;
 use backend::movie::container::MovieContainer;
+use backend::openapi::ApiDoc;
 use backend::scene::container::SceneContainer;
 use backend::song::container::SongContainer;
 use backend::track::container::TrackContainer;
@@ -92,6 +95,8 @@ async fn main() -> std::io::Result<()> {
 
     log::info!("Starting server on {}", bind);
 
+    let openapi = ApiDoc::openapi();
+
     let mut server = HttpServer::new(move || {
         let cors = Cors::default()
             .allowed_origin_fn(|origin, _req_head| {
@@ -109,6 +114,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)
             .wrap(middleware::Logger::default())
             .wrap(middleware::Compress::default())
+            .service(SwaggerUi::new("/docs/{_:.*}").url("/api-docs/openapi.json", openapi.clone()))
             .service(
                 web::scope("/api")
                     .configure(|cfg| iam.configure(cfg))

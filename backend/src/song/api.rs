@@ -1,5 +1,6 @@
 use actix_web::{HttpResponse, web};
 use serde::Deserialize;
+use utoipa::IntoParams;
 
 use crate::error::AppError;
 use crate::iam::auth::AuthContext;
@@ -14,8 +15,8 @@ use super::service::SongService;
 // Query params
 // ============================================================================
 
-#[derive(Debug, Deserialize)]
-struct FindSongsQuery {
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct FindSongsQuery {
     #[serde(default = "default_page")]
     page: i64,
     #[serde(default = "default_page_size")]
@@ -33,11 +34,30 @@ fn default_page_size() -> i64 {
     20
 }
 
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+struct PaginatedSongs {
+    items: Vec<SongResponse>,
+    pagination: crate::kernel::Page,
+}
+
 // ============================================================================
 // Handlers
 // ============================================================================
 
-async fn create_song(
+/// Create a song
+#[utoipa::path(
+    post,
+    path = "/api/songs",
+    tag = "Songs",
+    security(("bearer_auth" = [])),
+    request_body = CreateSongRequest,
+    responses(
+        (status = 201, description = "Song created", body = SongResponse),
+        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn create_song(
     auth: AuthContext,
     svc: web::Data<SongService>,
     body: web::Json<CreateSongRequest>,
@@ -47,7 +67,19 @@ async fn create_song(
     Ok(HttpResponse::Created().json(SongResponse::from(&song)))
 }
 
-async fn find_songs(
+/// List / search songs
+#[utoipa::path(
+    get,
+    path = "/api/songs",
+    tag = "Songs",
+    security(("bearer_auth" = [])),
+    params(FindSongsQuery),
+    responses(
+        (status = 200, description = "Paginated songs", body = PaginatedSongs),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn find_songs(
     auth: AuthContext,
     svc: web::Data<SongService>,
     query: web::Query<FindSongsQuery>,
@@ -72,7 +104,20 @@ async fn find_songs(
     })))
 }
 
-async fn get_song(
+/// Get a song
+#[utoipa::path(
+    get,
+    path = "/api/songs/{id}",
+    tag = "Songs",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "Song id")),
+    responses(
+        (status = 200, description = "Song", body = SongResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Song not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn get_song(
     auth: AuthContext,
     svc: web::Data<SongService>,
     path: web::Path<String>,
@@ -84,7 +129,22 @@ async fn get_song(
     Ok(HttpResponse::Ok().json(SongResponse::from(&song)))
 }
 
-async fn update_song(
+/// Update a song
+#[utoipa::path(
+    put,
+    path = "/api/songs/{id}",
+    tag = "Songs",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "Song id")),
+    request_body = UpdateSongRequest,
+    responses(
+        (status = 200, description = "Song updated", body = SongResponse),
+        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Song not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn update_song(
     auth: AuthContext,
     svc: web::Data<SongService>,
     path: web::Path<String>,
@@ -97,7 +157,20 @@ async fn update_song(
     Ok(HttpResponse::Ok().json(SongResponse::from(&song)))
 }
 
-async fn delete_song(
+/// Delete a song
+#[utoipa::path(
+    delete,
+    path = "/api/songs/{id}",
+    tag = "Songs",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "Song id")),
+    responses(
+        (status = 204, description = "Song deleted"),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Song not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn delete_song(
     auth: AuthContext,
     svc: web::Data<SongService>,
     path: web::Path<String>,
@@ -108,7 +181,19 @@ async fn delete_song(
     Ok(HttpResponse::NoContent().finish())
 }
 
-async fn list_by_artist(
+/// List songs by artist
+#[utoipa::path(
+    get,
+    path = "/api/artists/{id}/songs",
+    tag = "Songs",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "Artist (user) id")),
+    responses(
+        (status = 200, description = "Songs by this artist", body = Vec<SongResponse>),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn list_by_artist(
     auth: AuthContext,
     svc: web::Data<SongService>,
     path: web::Path<String>,
@@ -121,7 +206,20 @@ async fn list_by_artist(
     Ok(HttpResponse::Ok().json(res))
 }
 
-async fn list_song_tracks(
+/// List a song's tracks (placements across scenes)
+#[utoipa::path(
+    get,
+    path = "/api/songs/{id}/tracks",
+    tag = "Songs",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "Song id")),
+    responses(
+        (status = 200, description = "Song tracks", body = Vec<TrackResponse>),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Song not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn list_song_tracks(
     auth: AuthContext,
     svc: web::Data<TrackService>,
     path: web::Path<String>,

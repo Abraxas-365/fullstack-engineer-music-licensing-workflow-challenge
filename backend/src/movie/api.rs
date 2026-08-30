@@ -1,5 +1,6 @@
 use actix_web::{HttpResponse, web};
 use serde::Deserialize;
+use utoipa::{IntoParams, ToSchema};
 
 use crate::error::AppError;
 use crate::iam::auth::AuthContext;
@@ -17,8 +18,8 @@ use super::service::MovieService;
 // Query params
 // ============================================================================
 
-#[derive(Debug, Deserialize)]
-struct FindMoviesQuery {
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct FindMoviesQuery {
     #[serde(default = "default_page")]
     page: i64,
     #[serde(default = "default_page_size")]
@@ -34,11 +35,30 @@ fn default_page_size() -> i64 {
     20
 }
 
+#[derive(Debug, serde::Serialize, ToSchema)]
+struct PaginatedMovies {
+    items: Vec<MovieResponse>,
+    pagination: crate::kernel::Page,
+}
+
 // ============================================================================
 // Handlers
 // ============================================================================
 
-async fn create_movie(
+/// Create a movie
+#[utoipa::path(
+    post,
+    path = "/api/movies",
+    tag = "Movies",
+    security(("bearer_auth" = [])),
+    request_body = CreateMovieRequest,
+    responses(
+        (status = 201, description = "Movie created", body = MovieResponse),
+        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn create_movie(
     auth: AuthContext,
     svc: web::Data<MovieService>,
     body: web::Json<CreateMovieRequest>,
@@ -48,7 +68,19 @@ async fn create_movie(
     Ok(HttpResponse::Created().json(MovieResponse::from(movie)))
 }
 
-async fn find_movies(
+/// List / search movies
+#[utoipa::path(
+    get,
+    path = "/api/movies",
+    tag = "Movies",
+    security(("bearer_auth" = [])),
+    params(FindMoviesQuery),
+    responses(
+        (status = 200, description = "Paginated movies", body = PaginatedMovies),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn find_movies(
     auth: AuthContext,
     svc: web::Data<MovieService>,
     query: web::Query<FindMoviesQuery>,
@@ -75,7 +107,20 @@ async fn find_movies(
     })))
 }
 
-async fn get_movie(
+/// Get a movie
+#[utoipa::path(
+    get,
+    path = "/api/movies/{id}",
+    tag = "Movies",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "Movie id")),
+    responses(
+        (status = 200, description = "Movie", body = MovieResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Movie not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn get_movie(
     auth: AuthContext,
     svc: web::Data<MovieService>,
     path: web::Path<String>,
@@ -87,7 +132,22 @@ async fn get_movie(
     Ok(HttpResponse::Ok().json(MovieResponse::from(movie)))
 }
 
-async fn update_movie(
+/// Update a movie
+#[utoipa::path(
+    put,
+    path = "/api/movies/{id}",
+    tag = "Movies",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "Movie id")),
+    request_body = UpdateMovieRequest,
+    responses(
+        (status = 200, description = "Movie updated", body = MovieResponse),
+        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Movie not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn update_movie(
     auth: AuthContext,
     svc: web::Data<MovieService>,
     path: web::Path<String>,
@@ -104,7 +164,20 @@ async fn update_movie(
     Ok(HttpResponse::Ok().json(MovieResponse::from(movie)))
 }
 
-async fn delete_movie(
+/// Delete a movie
+#[utoipa::path(
+    delete,
+    path = "/api/movies/{id}",
+    tag = "Movies",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "Movie id")),
+    responses(
+        (status = 204, description = "Movie deleted"),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Movie not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn delete_movie(
     auth: AuthContext,
     svc: web::Data<MovieService>,
     path: web::Path<String>,
@@ -115,7 +188,18 @@ async fn delete_movie(
     Ok(HttpResponse::NoContent().finish())
 }
 
-async fn my_movies(
+/// List movies the current user is a member of
+#[utoipa::path(
+    get,
+    path = "/api/movies/me",
+    tag = "Movies",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Movies the caller belongs to", body = Vec<MovieResponse>),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn my_movies(
     auth: AuthContext,
     svc: web::Data<MovieService>,
 ) -> Result<HttpResponse, AppError> {
@@ -125,7 +209,22 @@ async fn my_movies(
     Ok(HttpResponse::Ok().json(res))
 }
 
-async fn add_member(
+/// Add a member to a movie
+#[utoipa::path(
+    post,
+    path = "/api/movies/{id}/members",
+    tag = "Movies",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "Movie id")),
+    request_body = AddMovieMemberRequest,
+    responses(
+        (status = 201, description = "Member added", body = MovieMemberResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Movie not found", body = crate::error::ErrorResponse),
+        (status = 409, description = "User is already a member", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn add_member(
     auth: AuthContext,
     svc: web::Data<MovieService>,
     path: web::Path<String>,
@@ -142,7 +241,23 @@ async fn add_member(
     Ok(HttpResponse::Created().json(MovieMemberResponse::from(&member)))
 }
 
-async fn remove_member(
+/// Remove a member from a movie
+#[utoipa::path(
+    delete,
+    path = "/api/movies/{id}/members/{user_id}",
+    tag = "Movies",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = String, Path, description = "Movie id"),
+        ("user_id" = String, Path, description = "User id to remove"),
+    ),
+    responses(
+        (status = 204, description = "Member removed"),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Movie or member not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn remove_member(
     auth: AuthContext,
     svc: web::Data<MovieService>,
     path: web::Path<(String, String)>,
@@ -158,7 +273,20 @@ async fn remove_member(
     Ok(HttpResponse::NoContent().finish())
 }
 
-async fn list_members(
+/// List members of a movie
+#[utoipa::path(
+    get,
+    path = "/api/movies/{id}/members",
+    tag = "Movies",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "Movie id")),
+    responses(
+        (status = 200, description = "Movie members", body = Vec<MovieMemberResponse>),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Movie not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn list_members(
     auth: AuthContext,
     svc: web::Data<MovieService>,
     path: web::Path<String>,
@@ -171,7 +299,20 @@ async fn list_members(
     Ok(HttpResponse::Ok().json(res))
 }
 
-async fn list_movie_scenes(
+/// List a movie's scenes
+#[utoipa::path(
+    get,
+    path = "/api/movies/{id}/scenes",
+    tag = "Movies",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "Movie id")),
+    responses(
+        (status = 200, description = "Movie scenes", body = Vec<SceneResponse>),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Movie not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn list_movie_scenes(
     auth: AuthContext,
     svc: web::Data<SceneService>,
     path: web::Path<String>,

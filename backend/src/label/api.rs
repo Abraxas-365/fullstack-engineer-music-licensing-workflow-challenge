@@ -15,7 +15,20 @@ use super::service::LabelService;
 // Handlers
 // ============================================================================
 
-async fn create_label(
+/// Create a label
+#[utoipa::path(
+    post,
+    path = "/api/labels",
+    tag = "Labels",
+    security(("bearer_auth" = [])),
+    request_body = CreateLabelRequest,
+    responses(
+        (status = 201, description = "Label created", body = LabelResponse),
+        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn create_label(
     auth: AuthContext,
     svc: web::Data<LabelService>,
     body: web::Json<CreateLabelRequest>,
@@ -25,7 +38,18 @@ async fn create_label(
     Ok(HttpResponse::Created().json(LabelResponse::from(&label)))
 }
 
-async fn list_labels(
+/// List labels
+#[utoipa::path(
+    get,
+    path = "/api/labels",
+    tag = "Labels",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "All labels", body = Vec<LabelResponse>),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn list_labels(
     auth: AuthContext,
     svc: web::Data<LabelService>,
 ) -> Result<HttpResponse, AppError> {
@@ -35,7 +59,20 @@ async fn list_labels(
     Ok(HttpResponse::Ok().json(res))
 }
 
-async fn get_label(
+/// Get a label
+#[utoipa::path(
+    get,
+    path = "/api/labels/{id}",
+    tag = "Labels",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "Label id")),
+    responses(
+        (status = 200, description = "Label", body = LabelResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Label not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn get_label(
     auth: AuthContext,
     svc: web::Data<LabelService>,
     path: web::Path<String>,
@@ -47,7 +84,22 @@ async fn get_label(
     Ok(HttpResponse::Ok().json(LabelResponse::from(&label)))
 }
 
-async fn update_label(
+/// Update a label
+#[utoipa::path(
+    put,
+    path = "/api/labels/{id}",
+    tag = "Labels",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "Label id")),
+    request_body = UpdateLabelRequest,
+    responses(
+        (status = 200, description = "Label updated", body = LabelResponse),
+        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Label not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn update_label(
     auth: AuthContext,
     svc: web::Data<LabelService>,
     path: web::Path<String>,
@@ -60,7 +112,20 @@ async fn update_label(
     Ok(HttpResponse::Ok().json(LabelResponse::from(&label)))
 }
 
-async fn delete_label(
+/// Delete a label
+#[utoipa::path(
+    delete,
+    path = "/api/labels/{id}",
+    tag = "Labels",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "Label id")),
+    responses(
+        (status = 204, description = "Label deleted"),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Label not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn delete_label(
     auth: AuthContext,
     svc: web::Data<LabelService>,
     path: web::Path<String>,
@@ -71,7 +136,22 @@ async fn delete_label(
     Ok(HttpResponse::NoContent().finish())
 }
 
-async fn add_member(
+/// Add a member to a label
+#[utoipa::path(
+    post,
+    path = "/api/labels/{id}/members",
+    tag = "Labels",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "Label id")),
+    request_body = AddMemberRequest,
+    responses(
+        (status = 201, description = "Member added", body = LabelMemberResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Label not found", body = crate::error::ErrorResponse),
+        (status = 409, description = "User is already a member", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn add_member(
     auth: AuthContext,
     svc: web::Data<LabelService>,
     path: web::Path<String>,
@@ -84,7 +164,23 @@ async fn add_member(
     Ok(HttpResponse::Created().json(LabelMemberResponse::from(&member)))
 }
 
-async fn remove_member(
+/// Remove a member from a label
+#[utoipa::path(
+    delete,
+    path = "/api/labels/{id}/members/{user_id}",
+    tag = "Labels",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = String, Path, description = "Label id"),
+        ("user_id" = String, Path, description = "User id to remove"),
+    ),
+    responses(
+        (status = 204, description = "Member removed"),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Label or member not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn remove_member(
     auth: AuthContext,
     svc: web::Data<LabelService>,
     path: web::Path<(String, String)>,
@@ -99,7 +195,20 @@ async fn remove_member(
     Ok(HttpResponse::NoContent().finish())
 }
 
-async fn list_members(
+/// List members of a label
+#[utoipa::path(
+    get,
+    path = "/api/labels/{id}/members",
+    tag = "Labels",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "Label id")),
+    responses(
+        (status = 200, description = "Label members", body = Vec<LabelMemberResponse>),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Label not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn list_members(
     auth: AuthContext,
     svc: web::Data<LabelService>,
     path: web::Path<String>,
@@ -112,7 +221,19 @@ async fn list_members(
     Ok(HttpResponse::Ok().json(res))
 }
 
-async fn get_user_labels(
+/// List labels a user belongs to
+#[utoipa::path(
+    get,
+    path = "/api/users/{id}/labels",
+    tag = "Labels",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "User id")),
+    responses(
+        (status = 200, description = "Labels the user belongs to", body = Vec<LabelResponse>),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn get_user_labels(
     auth: AuthContext,
     svc: web::Data<LabelService>,
     path: web::Path<String>,
@@ -125,7 +246,20 @@ async fn get_user_labels(
     Ok(HttpResponse::Ok().json(res))
 }
 
-async fn list_label_songs(
+/// List a label's songs
+#[utoipa::path(
+    get,
+    path = "/api/labels/{id}/songs",
+    tag = "Labels",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "Label id")),
+    responses(
+        (status = 200, description = "Songs owned by this label", body = Vec<SongResponse>),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Label not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn list_label_songs(
     auth: AuthContext,
     svc: web::Data<SongService>,
     path: web::Path<String>,

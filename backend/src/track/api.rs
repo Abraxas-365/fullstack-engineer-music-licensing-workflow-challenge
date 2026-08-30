@@ -13,7 +13,21 @@ use super::service::TrackService;
 // Handlers
 // ============================================================================
 
-async fn create_track(
+/// Create a track (place a song into a scene)
+#[utoipa::path(
+    post,
+    path = "/api/tracks",
+    tag = "Tracks",
+    security(("bearer_auth" = [])),
+    request_body = CreateTrackRequest,
+    responses(
+        (status = 201, description = "Track created", body = TrackResponse),
+        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Scene or song not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn create_track(
     auth: AuthContext,
     svc: web::Data<TrackService>,
     body: web::Json<CreateTrackRequest>,
@@ -23,7 +37,20 @@ async fn create_track(
     Ok(HttpResponse::Created().json(TrackResponse::from(track)))
 }
 
-async fn get_track(
+/// Get a track
+#[utoipa::path(
+    get,
+    path = "/api/tracks/{id}",
+    tag = "Tracks",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "Track id")),
+    responses(
+        (status = 200, description = "Track", body = TrackResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Track not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn get_track(
     auth: AuthContext,
     svc: web::Data<TrackService>,
     path: web::Path<String>,
@@ -35,7 +62,22 @@ async fn get_track(
     Ok(HttpResponse::Ok().json(TrackResponse::from(track)))
 }
 
-async fn update_track(
+/// Update a track
+#[utoipa::path(
+    put,
+    path = "/api/tracks/{id}",
+    tag = "Tracks",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "Track id")),
+    request_body = UpdateTrackRequest,
+    responses(
+        (status = 200, description = "Track updated", body = TrackResponse),
+        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Track not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn update_track(
     auth: AuthContext,
     svc: web::Data<TrackService>,
     path: web::Path<String>,
@@ -52,7 +94,20 @@ async fn update_track(
     Ok(HttpResponse::Ok().json(TrackResponse::from(track)))
 }
 
-async fn delete_track(
+/// Delete a track
+#[utoipa::path(
+    delete,
+    path = "/api/tracks/{id}",
+    tag = "Tracks",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "Track id")),
+    responses(
+        (status = 204, description = "Track deleted"),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Track not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn delete_track(
     auth: AuthContext,
     svc: web::Data<TrackService>,
     path: web::Path<String>,
@@ -63,7 +118,20 @@ async fn delete_track(
     Ok(HttpResponse::NoContent().finish())
 }
 
-async fn get_track_license(
+/// Get the license request associated with a track, if any
+#[utoipa::path(
+    get,
+    path = "/api/tracks/{id}/license",
+    tag = "Tracks",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Path, description = "Track id")),
+    responses(
+        (status = 200, description = "License request, or null if none exists", body = Option<LicenseRequestResponse>),
+        (status = 401, description = "Unauthorized", body = crate::error::ErrorResponse),
+        (status = 404, description = "Track not found", body = crate::error::ErrorResponse),
+    )
+)]
+pub async fn get_track_license(
     auth: AuthContext,
     svc: web::Data<LicenseService>,
     path: web::Path<String>,
