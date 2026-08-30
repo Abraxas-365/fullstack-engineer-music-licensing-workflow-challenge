@@ -6,7 +6,7 @@ use backend::iam::user::adapters::{BcryptPasswordService, PostgresUserRepository
 use backend::iam::user::{PasswordService, User, UserRepository};
 use backend::kernel::{SceneId, SongId, TrackId, UserId};
 use backend::movie::adapters::PostgresMovieRepository;
-use backend::movie::{Movie, MovieRepository};
+use backend::movie::{Movie, MovieMember, MovieRepository, MovieRole};
 use backend::scene::adapters::PostgresSceneRepository;
 use backend::scene::{Scene, SceneRepository};
 use backend::song::adapters::PostgresSongRepository;
@@ -38,8 +38,12 @@ impl TestContext {
         let song_repo = Arc::new(PostgresSongRepository::new(db.pool.clone()));
         let track_repo = Arc::new(PostgresTrackRepository::new(db.pool.clone()));
         let password_svc = Arc::new(BcryptPasswordService::new());
-        let track_svc =
-            TrackService::new(track_repo.clone(), scene_repo.clone(), song_repo.clone());
+        let track_svc = TrackService::new(
+            track_repo.clone(),
+            scene_repo.clone(),
+            song_repo.clone(),
+            movie_repo.clone(),
+        );
 
         Self {
             track_svc,
@@ -63,18 +67,27 @@ impl TestContext {
         user
     }
 
-    async fn create_movie(&self) -> Movie {
+    async fn create_movie(&self) -> (Movie, User) {
         let user = self.create_user().await;
         let movie = Movie::new("Test Movie".into(), user.id.clone());
         self.movie_repo.save(&movie).await.unwrap();
-        movie
+        self.movie_repo
+            .add_member(&MovieMember {
+                movie_id: movie.id.clone(),
+                user_id: user.id.clone(),
+                role: MovieRole::Owner,
+                joined_at: movie.created_at,
+            })
+            .await
+            .unwrap();
+        (movie, user)
     }
 
-    async fn create_scene(&self) -> Scene {
-        let movie = self.create_movie().await;
+    async fn create_scene(&self) -> (Scene, User) {
+        let (movie, user) = self.create_movie().await;
         let scene = Scene::new(movie.id.clone(), "Opening".into(), 1, 0, 120);
         self.scene_repo.save(&scene).await.unwrap();
-        scene
+        (scene, user)
     }
 
     async fn create_song(&self) -> Song {
@@ -88,6 +101,15 @@ impl TestContext {
         let user = self.create_user().await;
         let movie = Movie::new("Test Movie".into(), user.id.clone());
         self.movie_repo.save(&movie).await.unwrap();
+        self.movie_repo
+            .add_member(&MovieMember {
+                movie_id: movie.id.clone(),
+                user_id: user.id.clone(),
+                role: MovieRole::Owner,
+                joined_at: movie.created_at,
+            })
+            .await
+            .unwrap();
         let scene = Scene::new(movie.id.clone(), "Opening".into(), 1, 0, 120);
         self.scene_repo.save(&scene).await.unwrap();
         let song = Song::new("Test Song".into(), user.id.clone(), None, 240);
@@ -335,12 +357,12 @@ async fn test_service_create_track_scene_not_found() {
 #[tokio::test]
 async fn test_service_create_track_song_not_found() {
     let ctx = TestContext::new().await;
-    let scene = ctx.create_scene().await;
+    let (scene, user) = ctx.create_scene().await;
     let err = ctx
         .track_svc
         .create_track(
             ctx.create_req(scene.id.clone(), SongId::new()),
-            UserId::new(),
+            user.id.clone(),
         )
         .await
         .unwrap_err();
@@ -416,6 +438,15 @@ async fn test_service_list_by_scene() {
     let user = ctx.create_user().await;
     let movie = Movie::new("Movie".into(), user.id.clone());
     ctx.movie_repo.save(&movie).await.unwrap();
+    ctx.movie_repo
+        .add_member(&MovieMember {
+            movie_id: movie.id.clone(),
+            user_id: user.id.clone(),
+            role: MovieRole::Owner,
+            joined_at: movie.created_at,
+        })
+        .await
+        .unwrap();
     let scene = Scene::new(movie.id.clone(), "S1".into(), 1, 0, 60);
     ctx.scene_repo.save(&scene).await.unwrap();
 
@@ -467,6 +498,7 @@ async fn test_service_update_track() {
                 usage_type: Some("CREDITS".into()),
                 notes: Some("End credits music".into()),
             },
+            &user.id,
         )
         .await
         .unwrap();
@@ -477,6 +509,7 @@ async fn test_service_update_track() {
 #[tokio::test]
 async fn test_service_update_track_not_found() {
     let ctx = TestContext::new().await;
+    let actor = UserId::new();
     let err = ctx
         .track_svc
         .update_track(
@@ -485,6 +518,7 @@ async fn test_service_update_track_not_found() {
                 usage_type: Some("FEATURED".into()),
                 notes: None,
             },
+            &actor,
         )
         .await
         .unwrap_err();
@@ -507,7 +541,10 @@ async fn test_service_delete_track() {
         )
         .await
         .unwrap();
-    ctx.track_svc.delete_track(&created.id).await.unwrap();
+    ctx.track_svc
+        .delete_track(&created.id, &user.id)
+        .await
+        .unwrap();
     let err = ctx.track_svc.get_track(&created.id).await.unwrap_err();
     assert_eq!(err.code, "track.not_found");
 }
@@ -515,9 +552,10 @@ async fn test_service_delete_track() {
 #[tokio::test]
 async fn test_service_delete_track_not_found() {
     let ctx = TestContext::new().await;
+    let actor = UserId::new();
     let err = ctx
         .track_svc
-        .delete_track(&TrackId::new())
+        .delete_track(&TrackId::new(), &actor)
         .await
         .unwrap_err();
     assert_eq!(err.code, "track.not_found");

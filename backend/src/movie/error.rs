@@ -30,4 +30,12 @@ impl MovieError {
             ErrorType::NotFound,
         )
     }
+
+    pub fn not_authorized() -> AppError {
+        AppError::new(
+            "movie.not_authorized",
+            "Not authorized to perform this action on this movie",
+            ErrorType::Authorization,
+        )
+    }
 }

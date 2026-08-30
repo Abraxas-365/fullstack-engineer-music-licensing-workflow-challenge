@@ -105,7 +105,7 @@ async fn test_jwt_generate_and_validate_access_token() {
         user_id: backend::kernel::UserId::new(),
         email: "test@example.com".into(),
         name: "Test".into(),
-        scopes: vec!["users:read".into()],
+        scopes: vec!["movies:read".into()],
     };
 
     let token = svc.generate_access_token(&claims).unwrap();
@@ -113,7 +113,7 @@ async fn test_jwt_generate_and_validate_access_token() {
 
     assert_eq!(decoded.email, "test@example.com");
     assert_eq!(decoded.name, "Test");
-    assert_eq!(decoded.scopes, vec!["users:read"]);
+    assert_eq!(decoded.scopes, vec!["movies:read"]);
 }
 
 #[tokio::test]
@@ -296,7 +296,7 @@ async fn test_login_includes_effective_scopes() {
         .create_role(CreateRoleRequest {
             name: "Editor".into(),
             description: None,
-            scopes: vec!["users:read".into(), "users:write".into()],
+            scopes: vec!["movies:read".into(), "movies:write".into()],
         })
         .await
         .unwrap();
@@ -321,8 +321,8 @@ async fn test_login_includes_effective_scopes() {
         .token_svc
         .validate_access_token(&pair.access_token)
         .unwrap();
-    assert!(claims.scopes.contains(&"users:read".to_string()));
-    assert!(claims.scopes.contains(&"users:write".to_string()));
+    assert!(claims.scopes.contains(&"movies:read".to_string()));
+    assert!(claims.scopes.contains(&"movies:write".to_string()));
 }
 
 // ============================================================================

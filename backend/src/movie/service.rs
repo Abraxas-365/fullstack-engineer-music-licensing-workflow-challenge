@@ -26,6 +26,46 @@ impl MovieService {
         }
     }
 
+    // ========================================================================
+    // Authorization helpers
+    // ========================================================================
+
+    /// Assert the actor is a movie team member with a write role
+    /// (Owner, Supervisor, or Editor — not Viewer).
+    async fn assert_team_writer(&self, movie_id: &MovieId, actor: &UserId) -> Result<(), AppError> {
+        let member = self.movie_repo.get_member(movie_id, actor).await?;
+        match member {
+            Some(m) if m.role != MovieRole::Viewer => Ok(()),
+            _ => Err(MovieError::not_authorized()),
+        }
+    }
+
+    /// Assert the actor is the movie Owner.
+    async fn assert_owner(&self, movie_id: &MovieId, actor: &UserId) -> Result<(), AppError> {
+        let member = self.movie_repo.get_member(movie_id, actor).await?;
+        match member {
+            Some(m) if m.role == MovieRole::Owner => Ok(()),
+            _ => Err(MovieError::not_authorized()),
+        }
+    }
+
+    /// Assert the actor is Owner or Supervisor (can manage members).
+    async fn assert_can_manage_members(
+        &self,
+        movie_id: &MovieId,
+        actor: &UserId,
+    ) -> Result<(), AppError> {
+        let member = self.movie_repo.get_member(movie_id, actor).await?;
+        match member {
+            Some(m) if matches!(m.role, MovieRole::Owner | MovieRole::Supervisor) => Ok(()),
+            _ => Err(MovieError::not_authorized()),
+        }
+    }
+
+    // ========================================================================
+    // CRUD
+    // ========================================================================
+
     pub async fn create_movie(
         &self,
         req: CreateMovieRequest,
@@ -77,10 +117,14 @@ impl MovieService {
         &self,
         id: &MovieId,
         req: UpdateMovieRequest,
+        actor: &UserId,
     ) -> Result<Movie, AppError> {
         req.validate()?;
 
-        let mut movie = self.get_movie(id).await?;
+        let movie = self.get_movie(id).await?;
+        self.assert_team_writer(&movie.id, actor).await?;
+
+        let mut movie = movie;
 
         if let Some(title) = req.title {
             movie.title = title;
@@ -100,8 +144,9 @@ impl MovieService {
         Ok(movie)
     }
 
-    pub async fn delete_movie(&self, id: &MovieId) -> Result<(), AppError> {
+    pub async fn delete_movie(&self, id: &MovieId, actor: &UserId) -> Result<(), AppError> {
         self.get_movie(id).await?;
+        self.assert_owner(id, actor).await?;
         self.movie_repo.delete(id).await
     }
 
@@ -117,11 +162,14 @@ impl MovieService {
         &self,
         movie_id: &MovieId,
         req: AddMovieMemberRequest,
+        actor: &UserId,
     ) -> Result<MovieMember, AppError> {
         self.movie_repo
             .get_by_id(movie_id)
             .await?
             .ok_or_else(|| MovieError::not_found())?;
+
+        self.assert_can_manage_members(movie_id, actor).await?;
 
         self.user_repo
             .get_by_id(&req.user_id)
@@ -157,7 +205,10 @@ impl MovieService {
         &self,
         movie_id: &MovieId,
         user_id: &UserId,
+        actor: &UserId,
     ) -> Result<(), AppError> {
+        self.assert_can_manage_members(movie_id, actor).await?;
+
         self.movie_repo
             .get_member(movie_id, user_id)
             .await?
@@ -517,6 +568,7 @@ mod tests {
                     release_year: Some(2025),
                     director: Some("New Director".into()),
                 },
+                &user.id,
             )
             .await
             .unwrap();
@@ -544,6 +596,7 @@ mod tests {
                     release_year: None,
                     director: None,
                 },
+                &user.id,
             )
             .await
             .unwrap();
@@ -555,6 +608,7 @@ mod tests {
     #[tokio::test]
     async fn update_movie_not_found() {
         let svc = make_svc(MockMovieRepo::new(), MockUserRepo::new());
+        let actor = UserId::new();
         let err = svc
             .update_movie(
                 &MovieId::new(),
@@ -564,6 +618,7 @@ mod tests {
                     release_year: None,
                     director: None,
                 },
+                &actor,
             )
             .await
             .unwrap_err();
@@ -587,6 +642,7 @@ mod tests {
                     release_year: None,
                     director: None,
                 },
+                &user.id,
             )
             .await
             .unwrap_err();
@@ -610,6 +666,7 @@ mod tests {
                     release_year: Some(3000),
                     director: None,
                 },
+                &user.id,
             )
             .await
             .unwrap_err();
@@ -628,7 +685,7 @@ mod tests {
             .create_movie(create_req("Movie"), user.id.clone())
             .await
             .unwrap();
-        svc.delete_movie(&movie.id).await.unwrap();
+        svc.delete_movie(&movie.id, &user.id).await.unwrap();
         let err = svc.get_movie(&movie.id).await.unwrap_err();
         assert_eq!(err.code, "movie.not_found");
     }
@@ -636,7 +693,8 @@ mod tests {
     #[tokio::test]
     async fn delete_movie_not_found() {
         let svc = make_svc(MockMovieRepo::new(), MockUserRepo::new());
-        let err = svc.delete_movie(&MovieId::new()).await.unwrap_err();
+        let actor = UserId::new();
+        let err = svc.delete_movie(&MovieId::new(), &actor).await.unwrap_err();
         assert_eq!(err.code, "movie.not_found");
     }
 
@@ -683,6 +741,7 @@ mod tests {
                     user_id: other_id.clone(),
                     role: Some("SUPERVISOR".into()),
                 },
+                &owner.id,
             )
             .await
             .unwrap();
@@ -710,6 +769,7 @@ mod tests {
                     user_id: other_id.clone(),
                     role: None,
                 },
+                &owner.id,
             )
             .await
             .unwrap();
@@ -727,6 +787,7 @@ mod tests {
                     user_id: user.id.clone(),
                     role: None,
                 },
+                &user.id,
             )
             .await
             .unwrap_err();
@@ -748,6 +809,7 @@ mod tests {
                     user_id: UserId::new(),
                     role: None,
                 },
+                &owner.id,
             )
             .await
             .unwrap_err();
@@ -770,6 +832,7 @@ mod tests {
                     user_id: owner.id.clone(),
                     role: None,
                 },
+                &owner.id,
             )
             .await
             .unwrap_err();
@@ -796,17 +859,25 @@ mod tests {
                 user_id: other_id.clone(),
                 role: None,
             },
+            &owner.id,
         )
         .await
         .unwrap();
-        svc.remove_member(&movie.id, &other_id).await.unwrap();
+        svc.remove_member(&movie.id, &other_id, &owner.id)
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
     async fn remove_member_not_found() {
-        let svc = make_svc(MockMovieRepo::new(), MockUserRepo::new());
+        let owner = make_user();
+        let svc = make_svc(MockMovieRepo::new(), MockUserRepo::with_user(owner.clone()));
+        let movie = svc
+            .create_movie(create_req("Movie"), owner.id.clone())
+            .await
+            .unwrap();
         let err = svc
-            .remove_member(&MovieId::new(), &UserId::new())
+            .remove_member(&movie.id, &UserId::new(), &owner.id)
             .await
             .unwrap_err();
         assert_eq!(err.code, "movie.member_not_found");
@@ -836,5 +907,176 @@ mod tests {
             .unwrap();
         let movies = svc.get_user_movies(&user.id).await.unwrap();
         assert_eq!(movies.len(), 2);
+    }
+
+    // ========================================================================
+    // Authorization
+    // ========================================================================
+
+    #[tokio::test]
+    async fn update_movie_viewer_denied() {
+        let owner = make_user();
+        let viewer = User::new_with_password("viewer@x.com".into(), "Viewer".into(), "hash".into());
+        let viewer_id = viewer.id.clone();
+        let user_repo = MockUserRepo::new();
+        user_repo.users.lock().await.push(owner.clone());
+        user_repo.users.lock().await.push(viewer);
+        let svc = make_svc(MockMovieRepo::new(), user_repo);
+
+        let movie = svc
+            .create_movie(create_req("Movie"), owner.id.clone())
+            .await
+            .unwrap();
+        svc.add_member(
+            &movie.id,
+            AddMovieMemberRequest {
+                user_id: viewer_id.clone(),
+                role: Some("VIEWER".into()),
+            },
+            &owner.id,
+        )
+        .await
+        .unwrap();
+
+        let err = svc
+            .update_movie(
+                &movie.id,
+                UpdateMovieRequest {
+                    title: Some("Nope".into()),
+                    description: None,
+                    release_year: None,
+                    director: None,
+                },
+                &viewer_id,
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(err.code, "movie.not_authorized");
+    }
+
+    #[tokio::test]
+    async fn update_movie_non_member_denied() {
+        let owner = make_user();
+        let svc = make_svc(MockMovieRepo::new(), MockUserRepo::with_user(owner.clone()));
+        let movie = svc
+            .create_movie(create_req("Movie"), owner.id.clone())
+            .await
+            .unwrap();
+
+        let outsider = UserId::new();
+        let err = svc
+            .update_movie(
+                &movie.id,
+                UpdateMovieRequest {
+                    title: Some("Nope".into()),
+                    description: None,
+                    release_year: None,
+                    director: None,
+                },
+                &outsider,
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(err.code, "movie.not_authorized");
+    }
+
+    #[tokio::test]
+    async fn delete_movie_non_owner_denied() {
+        let owner = make_user();
+        let editor = User::new_with_password("editor@x.com".into(), "Editor".into(), "hash".into());
+        let editor_id = editor.id.clone();
+        let user_repo = MockUserRepo::new();
+        user_repo.users.lock().await.push(owner.clone());
+        user_repo.users.lock().await.push(editor);
+        let svc = make_svc(MockMovieRepo::new(), user_repo);
+
+        let movie = svc
+            .create_movie(create_req("Movie"), owner.id.clone())
+            .await
+            .unwrap();
+        svc.add_member(
+            &movie.id,
+            AddMovieMemberRequest {
+                user_id: editor_id.clone(),
+                role: Some("EDITOR".into()),
+            },
+            &owner.id,
+        )
+        .await
+        .unwrap();
+
+        let err = svc.delete_movie(&movie.id, &editor_id).await.unwrap_err();
+        assert_eq!(err.code, "movie.not_authorized");
+    }
+
+    #[tokio::test]
+    async fn add_member_by_viewer_denied() {
+        let owner = make_user();
+        let viewer = User::new_with_password("viewer@x.com".into(), "Viewer".into(), "hash".into());
+        let viewer_id = viewer.id.clone();
+        let user_repo = MockUserRepo::new();
+        user_repo.users.lock().await.push(owner.clone());
+        user_repo.users.lock().await.push(viewer);
+        let svc = make_svc(MockMovieRepo::new(), user_repo);
+
+        let movie = svc
+            .create_movie(create_req("Movie"), owner.id.clone())
+            .await
+            .unwrap();
+        svc.add_member(
+            &movie.id,
+            AddMovieMemberRequest {
+                user_id: viewer_id.clone(),
+                role: Some("VIEWER".into()),
+            },
+            &owner.id,
+        )
+        .await
+        .unwrap();
+
+        let err = svc
+            .add_member(
+                &movie.id,
+                AddMovieMemberRequest {
+                    user_id: UserId::new(),
+                    role: None,
+                },
+                &viewer_id,
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(err.code, "movie.not_authorized");
+    }
+
+    #[tokio::test]
+    async fn remove_member_by_editor_denied() {
+        let owner = make_user();
+        let editor = User::new_with_password("editor@x.com".into(), "Editor".into(), "hash".into());
+        let editor_id = editor.id.clone();
+        let user_repo = MockUserRepo::new();
+        user_repo.users.lock().await.push(owner.clone());
+        user_repo.users.lock().await.push(editor);
+        let svc = make_svc(MockMovieRepo::new(), user_repo);
+
+        let movie = svc
+            .create_movie(create_req("Movie"), owner.id.clone())
+            .await
+            .unwrap();
+        svc.add_member(
+            &movie.id,
+            AddMovieMemberRequest {
+                user_id: editor_id.clone(),
+                role: Some("EDITOR".into()),
+            },
+            &owner.id,
+        )
+        .await
+        .unwrap();
+
+        let err = svc
+            .remove_member(&movie.id, &owner.id, &editor_id)
+            .await
+            .unwrap_err();
+        assert_eq!(err.code, "movie.not_authorized");
     }
 }

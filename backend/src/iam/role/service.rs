@@ -349,21 +349,21 @@ mod tests {
     async fn create_role_success() {
         let svc = make_svc(MockRoleRepo::new(), MockUserRepo::new());
         let res = svc
-            .create_role(create_req("Admin", vec!["users:read"]))
+            .create_role(create_req("Admin", vec!["movies:read"]))
             .await
             .unwrap();
         assert_eq!(res.name, "Admin");
-        assert_eq!(res.scopes, vec!["users:read"]);
+        assert_eq!(res.scopes, vec!["movies:read"]);
     }
 
     #[tokio::test]
     async fn create_role_duplicate_name() {
         let svc = make_svc(MockRoleRepo::new(), MockUserRepo::new());
-        svc.create_role(create_req("Admin", vec!["users:read"]))
+        svc.create_role(create_req("Admin", vec!["movies:read"]))
             .await
             .unwrap();
         let err = svc
-            .create_role(create_req("Admin", vec!["users:write"]))
+            .create_role(create_req("Admin", vec!["movies:write"]))
             .await
             .unwrap_err();
         assert_eq!(err.code, "role.already_exists");
@@ -397,7 +397,7 @@ mod tests {
     async fn create_role_short_name() {
         let svc = make_svc(MockRoleRepo::new(), MockUserRepo::new());
         let err = svc
-            .create_role(create_req("A", vec!["users:read"]))
+            .create_role(create_req("A", vec!["movies:read"]))
             .await
             .unwrap_err();
         assert_eq!(err.code, "VALIDATION_ERROR");
@@ -411,7 +411,7 @@ mod tests {
     async fn get_role_success() {
         let svc = make_svc(MockRoleRepo::new(), MockUserRepo::new());
         let created = svc
-            .create_role(create_req("Admin", vec!["users:read"]))
+            .create_role(create_req("Admin", vec!["movies:read"]))
             .await
             .unwrap();
         let found = svc.get_role(&created.id).await.unwrap();
@@ -428,10 +428,10 @@ mod tests {
     #[tokio::test]
     async fn list_roles_returns_all() {
         let svc = make_svc(MockRoleRepo::new(), MockUserRepo::new());
-        svc.create_role(create_req("Admin", vec!["users:read"]))
+        svc.create_role(create_req("Admin", vec!["movies:read"]))
             .await
             .unwrap();
-        svc.create_role(create_req("Editor", vec!["users:write"]))
+        svc.create_role(create_req("Editor", vec!["movies:write"]))
             .await
             .unwrap();
         let roles = svc.list_roles().await.unwrap();
@@ -446,7 +446,7 @@ mod tests {
     async fn update_role_success() {
         let svc = make_svc(MockRoleRepo::new(), MockUserRepo::new());
         let created = svc
-            .create_role(create_req("Old", vec!["users:read"]))
+            .create_role(create_req("Old", vec!["movies:read"]))
             .await
             .unwrap();
         let updated = svc
@@ -455,14 +455,14 @@ mod tests {
                 UpdateRoleRequest {
                     name: Some("New".into()),
                     description: Some("Updated".into()),
-                    scopes: Some(vec!["users:write".into()]),
+                    scopes: Some(vec!["movies:write".into()]),
                 },
             )
             .await
             .unwrap();
         assert_eq!(updated.name, "New");
         assert_eq!(updated.description, "Updated");
-        assert_eq!(updated.scopes, vec!["users:write"]);
+        assert_eq!(updated.scopes, vec!["movies:write"]);
     }
 
     #[tokio::test]
@@ -485,11 +485,11 @@ mod tests {
     #[tokio::test]
     async fn update_role_duplicate_name() {
         let svc = make_svc(MockRoleRepo::new(), MockUserRepo::new());
-        svc.create_role(create_req("Taken", vec!["users:read"]))
+        svc.create_role(create_req("Taken", vec!["movies:read"]))
             .await
             .unwrap();
         let other = svc
-            .create_role(create_req("Other", vec!["users:read"]))
+            .create_role(create_req("Other", vec!["movies:read"]))
             .await
             .unwrap();
         let err = svc
@@ -510,7 +510,7 @@ mod tests {
     async fn update_role_invalid_scopes() {
         let svc = make_svc(MockRoleRepo::new(), MockUserRepo::new());
         let created = svc
-            .create_role(create_req("Role", vec!["users:read"]))
+            .create_role(create_req("Role", vec!["movies:read"]))
             .await
             .unwrap();
         let err = svc
@@ -535,7 +535,7 @@ mod tests {
     async fn delete_role_success() {
         let svc = make_svc(MockRoleRepo::new(), MockUserRepo::new());
         let created = svc
-            .create_role(create_req("Admin", vec!["users:read"]))
+            .create_role(create_req("Admin", vec!["movies:read"]))
             .await
             .unwrap();
         svc.delete_role(&created.id).await.unwrap();
@@ -560,7 +560,7 @@ mod tests {
         let user_id = user.id.clone();
         let svc = make_svc(MockRoleRepo::new(), MockUserRepo::with_user(user));
         let role = svc
-            .create_role(create_req("Admin", vec!["users:read"]))
+            .create_role(create_req("Admin", vec!["movies:read"]))
             .await
             .unwrap();
         svc.assign_role_to_user(&role.id, &user_id).await.unwrap();
@@ -582,7 +582,7 @@ mod tests {
     async fn assign_role_user_not_found() {
         let svc = make_svc(MockRoleRepo::new(), MockUserRepo::new());
         let role = svc
-            .create_role(create_req("Admin", vec!["users:read"]))
+            .create_role(create_req("Admin", vec!["movies:read"]))
             .await
             .unwrap();
         let err = svc
@@ -599,11 +599,11 @@ mod tests {
         let svc = make_svc(MockRoleRepo::new(), MockUserRepo::with_user(user));
 
         let r1 = svc
-            .create_role(create_req("R1", vec!["users:read", "users:write"]))
+            .create_role(create_req("R1", vec!["movies:read", "movies:write"]))
             .await
             .unwrap();
         let r2 = svc
-            .create_role(create_req("R2", vec!["users:read", "roles:read"]))
+            .create_role(create_req("R2", vec!["movies:read", "tracks:read"]))
             .await
             .unwrap();
         svc.assign_role_to_user(&r1.id, &user_id).await.unwrap();
@@ -613,9 +613,13 @@ mod tests {
         assert_eq!(result.roles.len(), 2);
         // users:read should be deduplicated
         assert_eq!(result.effective_scopes.len(), 3);
-        assert!(result.effective_scopes.contains(&"users:read".to_string()));
-        assert!(result.effective_scopes.contains(&"users:write".to_string()));
-        assert!(result.effective_scopes.contains(&"roles:read".to_string()));
+        assert!(result.effective_scopes.contains(&"movies:read".to_string()));
+        assert!(
+            result
+                .effective_scopes
+                .contains(&"movies:write".to_string())
+        );
+        assert!(result.effective_scopes.contains(&"tracks:read".to_string()));
     }
 
     #[tokio::test]
@@ -632,17 +636,17 @@ mod tests {
         let svc = make_svc(MockRoleRepo::new(), MockUserRepo::with_user(user));
 
         let r1 = svc
-            .create_role(create_req("R1", vec!["users:read"]))
+            .create_role(create_req("R1", vec!["movies:read"]))
             .await
             .unwrap();
         let r2 = svc
-            .create_role(create_req("R2", vec!["users:read"]))
+            .create_role(create_req("R2", vec!["movies:read"]))
             .await
             .unwrap();
         svc.assign_role_to_user(&r1.id, &user_id).await.unwrap();
         svc.assign_role_to_user(&r2.id, &user_id).await.unwrap();
 
         let scopes = svc.get_effective_scopes(&user_id).await.unwrap();
-        assert_eq!(scopes, vec!["users:read"]);
+        assert_eq!(scopes, vec!["movies:read"]);
     }
 }
