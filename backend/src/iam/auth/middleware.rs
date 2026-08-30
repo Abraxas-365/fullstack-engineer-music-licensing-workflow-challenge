@@ -112,7 +112,7 @@ fn extract_bearer_token(req: &HttpRequest) -> Option<String> {
 //
 // Usage:
 //   web::scope("/users")
-//       .wrap(RequireScope::new("users:read"))
+//       .wrap(RequireScope::new("movies:read"))
 //       .route("", web::get().to(list_users))
 
 pub struct RequireScope {

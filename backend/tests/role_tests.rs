@@ -22,7 +22,7 @@ async fn test_save_and_get_role_by_id() {
     let role = backend::iam::role::Role::new(
         "Admin".into(),
         "Full access".into(),
-        vec!["users:read".into(), "users:write".into()],
+        vec!["movies:read".into(), "movies:write".into()],
     );
     let role_id = role.id.clone();
 
@@ -33,7 +33,7 @@ async fn test_save_and_get_role_by_id() {
     let found = found.unwrap();
     assert_eq!(found.name, "Admin");
     assert_eq!(found.description, "Full access");
-    assert_eq!(found.scopes, vec!["users:read", "users:write"]);
+    assert_eq!(found.scopes, vec!["movies:read", "movies:write"]);
 }
 
 #[tokio::test]
@@ -53,7 +53,7 @@ async fn test_get_role_by_name() {
     let role = backend::iam::role::Role::new(
         "Editor".into(),
         "Can edit".into(),
-        vec!["users:write".into()],
+        vec!["movies:write".into()],
     );
     repo.save(&role).await.unwrap();
 
@@ -70,8 +70,8 @@ async fn test_list_all_roles() {
     let db = TestDb::new().await;
     let repo = PostgresRoleRepository::new(db.pool.clone());
 
-    let r1 = backend::iam::role::Role::new("A-Role".into(), "".into(), vec!["users:read".into()]);
-    let r2 = backend::iam::role::Role::new("B-Role".into(), "".into(), vec!["roles:read".into()]);
+    let r1 = backend::iam::role::Role::new("A-Role".into(), "".into(), vec!["movies:read".into()]);
+    let r2 = backend::iam::role::Role::new("B-Role".into(), "".into(), vec!["tracks:read".into()]);
     repo.save(&r1).await.unwrap();
     repo.save(&r2).await.unwrap();
 
@@ -90,13 +90,13 @@ async fn test_update_role_via_save() {
     let mut role = backend::iam::role::Role::new(
         "Updatable".into(),
         "Before".into(),
-        vec!["users:read".into()],
+        vec!["movies:read".into()],
     );
     repo.save(&role).await.unwrap();
 
     role.name = "Updated".into();
     role.description = "After".into();
-    role.set_scopes(vec!["users:read".into(), "users:write".into()]);
+    role.set_scopes(vec!["movies:read".into(), "movies:write".into()]);
     repo.save(&role).await.unwrap();
 
     let found = repo.get_by_id(&role.id).await.unwrap().unwrap();
@@ -111,7 +111,7 @@ async fn test_delete_role() {
     let repo = PostgresRoleRepository::new(db.pool.clone());
 
     let role =
-        backend::iam::role::Role::new("Deletable".into(), "".into(), vec!["users:read".into()]);
+        backend::iam::role::Role::new("Deletable".into(), "".into(), vec!["movies:read".into()]);
     let role_id = role.id.clone();
     repo.save(&role).await.unwrap();
 
@@ -129,8 +129,8 @@ async fn test_assign_and_list_by_user() {
     let user = User::new_with_password("assign@example.com".into(), "Assign".into(), "hash".into());
     user_repo.save(&user).await.unwrap();
 
-    let r1 = backend::iam::role::Role::new("Role-A".into(), "".into(), vec!["users:read".into()]);
-    let r2 = backend::iam::role::Role::new("Role-B".into(), "".into(), vec!["roles:read".into()]);
+    let r1 = backend::iam::role::Role::new("Role-A".into(), "".into(), vec!["movies:read".into()]);
+    let r2 = backend::iam::role::Role::new("Role-B".into(), "".into(), vec!["tracks:read".into()]);
     role_repo.save(&r1).await.unwrap();
     role_repo.save(&r2).await.unwrap();
 
@@ -150,7 +150,8 @@ async fn test_assign_idempotent() {
     let user = User::new_with_password("idem@example.com".into(), "Idem".into(), "hash".into());
     user_repo.save(&user).await.unwrap();
 
-    let role = backend::iam::role::Role::new("Unique".into(), "".into(), vec!["users:read".into()]);
+    let role =
+        backend::iam::role::Role::new("Unique".into(), "".into(), vec!["movies:read".into()]);
     role_repo.save(&role).await.unwrap();
 
     // Assign twice — should not fail
@@ -175,7 +176,7 @@ async fn test_unassign_from_user() {
     user_repo.save(&user).await.unwrap();
 
     let role =
-        backend::iam::role::Role::new("Removable".into(), "".into(), vec!["users:read".into()]);
+        backend::iam::role::Role::new("Removable".into(), "".into(), vec!["movies:read".into()]);
     role_repo.save(&role).await.unwrap();
     role_repo.assign_to_user(&user.id, &role.id).await.unwrap();
 
@@ -201,7 +202,7 @@ async fn test_delete_role_cascades_assignments() {
     user_repo.save(&user).await.unwrap();
 
     let role =
-        backend::iam::role::Role::new("CascadeRole".into(), "".into(), vec!["users:read".into()]);
+        backend::iam::role::Role::new("CascadeRole".into(), "".into(), vec!["movies:read".into()]);
     let role_id = role.id.clone();
     role_repo.save(&role).await.unwrap();
     role_repo.assign_to_user(&user.id, &role_id).await.unwrap();
@@ -225,12 +226,12 @@ async fn test_service_create_role() {
     let req = CreateRoleRequest {
         name: "Viewer".into(),
         description: Some("Read-only access".into()),
-        scopes: vec!["users:read".into(), "roles:read".into()],
+        scopes: vec!["movies:read".into(), "tracks:read".into()],
     };
 
     let response = svc.create_role(req).await.unwrap();
     assert_eq!(response.name, "Viewer");
-    assert_eq!(response.scopes, vec!["users:read", "roles:read"]);
+    assert_eq!(response.scopes, vec!["movies:read", "tracks:read"]);
 }
 
 #[tokio::test]
@@ -243,14 +244,14 @@ async fn test_service_create_role_duplicate_name() {
     let req = CreateRoleRequest {
         name: "Duplicate".into(),
         description: None,
-        scopes: vec!["users:read".into()],
+        scopes: vec!["movies:read".into()],
     };
     svc.create_role(req).await.unwrap();
 
     let req2 = CreateRoleRequest {
         name: "Duplicate".into(),
         description: None,
-        scopes: vec!["roles:read".into()],
+        scopes: vec!["tracks:read".into()],
     };
     let err = svc.create_role(req2).await.unwrap_err();
     assert_eq!(err.code, "role.already_exists");
@@ -293,14 +294,14 @@ async fn test_service_update_role() {
     let req = CreateRoleRequest {
         name: "Before".into(),
         description: None,
-        scopes: vec!["users:read".into()],
+        scopes: vec!["movies:read".into()],
     };
     let created = svc.create_role(req).await.unwrap();
 
     let update = UpdateRoleRequest {
         name: Some("After".into()),
         description: Some("Updated desc".into()),
-        scopes: Some(vec!["users:read".into(), "users:write".into()]),
+        scopes: Some(vec!["movies:read".into(), "movies:write".into()]),
     };
     let updated = svc.update_role(&created.id, update).await.unwrap();
     assert_eq!(updated.name, "After");
@@ -318,7 +319,7 @@ async fn test_service_delete_role() {
     let req = CreateRoleRequest {
         name: "Deletable".into(),
         description: None,
-        scopes: vec!["users:read".into()],
+        scopes: vec!["movies:read".into()],
     };
     let created = svc.create_role(req).await.unwrap();
 
@@ -342,7 +343,7 @@ async fn test_service_assign_role_and_get_user_roles() {
         .create_role(CreateRoleRequest {
             name: "R1".into(),
             description: None,
-            scopes: vec!["users:read".into()],
+            scopes: vec!["movies:read".into()],
         })
         .await
         .unwrap();
@@ -351,7 +352,7 @@ async fn test_service_assign_role_and_get_user_roles() {
         .create_role(CreateRoleRequest {
             name: "R2".into(),
             description: None,
-            scopes: vec!["roles:read".into(), "users:read".into()],
+            scopes: vec!["tracks:read".into(), "movies:read".into()],
         })
         .await
         .unwrap();
@@ -365,19 +366,19 @@ async fn test_service_assign_role_and_get_user_roles() {
     assert!(
         user_roles
             .effective_scopes
-            .contains(&"users:read".to_string())
+            .contains(&"movies:read".to_string())
     );
     assert!(
         user_roles
             .effective_scopes
-            .contains(&"roles:read".to_string())
+            .contains(&"tracks:read".to_string())
     );
-    // "users:read" appears in both roles but should only show once
+    // "movies:read" appears in both roles but should only show once
     assert_eq!(
         user_roles
             .effective_scopes
             .iter()
-            .filter(|s| *s == "users:read")
+            .filter(|s| *s == "movies:read")
             .count(),
         1
     );
@@ -394,7 +395,7 @@ async fn test_service_assign_role_user_not_found() {
         .create_role(CreateRoleRequest {
             name: "Ghost".into(),
             description: None,
-            scopes: vec!["users:read".into()],
+            scopes: vec!["movies:read".into()],
         })
         .await
         .unwrap();
@@ -420,7 +421,7 @@ async fn test_service_unassign_role() {
         .create_role(CreateRoleRequest {
             name: "Temp".into(),
             description: None,
-            scopes: vec!["users:read".into()],
+            scopes: vec!["movies:read".into()],
         })
         .await
         .unwrap();
