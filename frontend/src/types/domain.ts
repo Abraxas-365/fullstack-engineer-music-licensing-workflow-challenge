@@ -28,8 +28,10 @@ export interface Scene {
   id: UUID
   movie_id: UUID
   title: string
+  scene_number: number
   description: string | null
-  scene_order: number
+  start_time: number
+  end_time: number
   duration_seconds: number
   created_at: string
   updated_at: string
@@ -69,9 +71,8 @@ export type LabelRole = 'OWNER' | 'REP' | 'ARTIST'
 export interface Label {
   id: UUID
   name: string
-  description: string | null
   website: string | null
-  created_by: UUID
+  contact_email: string | null
   created_at: string
   updated_at: string
 }
@@ -120,9 +121,14 @@ export interface LicenseOffer {
 export type PlatformRole = 'Admin' | 'Producer' | 'Artist' | 'Label Manager' | 'Viewer'
 
 // ─── Paginated response ───
+export interface Page {
+  page: number
+  page_size: number
+  total: number
+  pages: number
+}
+
 export interface Paginated<T> {
   items: T[]
-  total: number
-  page: number
-  per_page: number
+  pagination: Page
 }
