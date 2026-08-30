@@ -3,6 +3,7 @@ import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { UserAvatar } from '@/components/user-avatar'
+import { ApiModeToggle } from '@/components/api-mode-toggle'
 import { useTheme } from '@/components/theme-provider'
 import type { PlatformRole } from '@/types'
 
@@ -71,6 +72,8 @@ export function AppHeader({ userName = 'User', userRole }: AppHeaderProps) {
           <span className="font-semibold text-[15px] tracking-tight">Music Licensing</span>
         </div>
         <div className="flex items-center gap-4">
+          <ApiModeToggle />
+          <Separator orientation="vertical" className="h-4" />
           <div className="flex items-center gap-2">
             <Label htmlFor="theme" className="text-xs text-muted-foreground">
               {theme === 'dark' ? 'Dark' : 'Light'}
