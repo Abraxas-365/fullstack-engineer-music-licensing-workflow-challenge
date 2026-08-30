@@ -14,4 +14,12 @@ impl SceneError {
             ErrorType::Conflict,
         )
     }
+
+    pub fn not_authorized() -> AppError {
+        AppError::new(
+            "scene.not_authorized",
+            "Not authorized to perform this action on this scene",
+            ErrorType::Authorization,
+        )
+    }
 }

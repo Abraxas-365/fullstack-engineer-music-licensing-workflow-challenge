@@ -4,6 +4,7 @@ use chrono::Utc;
 
 use crate::error::AppError;
 use crate::kernel::{TrackId, UserId};
+use crate::movie::{MovieRepository, MovieRole};
 use crate::scene::SceneRepository;
 use crate::song::SongRepository;
 
@@ -15,6 +16,7 @@ pub struct TrackService {
     track_repo: Arc<dyn TrackRepository>,
     scene_repo: Arc<dyn SceneRepository>,
     song_repo: Arc<dyn SongRepository>,
+    movie_repo: Arc<dyn MovieRepository>,
 }
 
 impl TrackService {
@@ -22,13 +24,43 @@ impl TrackService {
         track_repo: Arc<dyn TrackRepository>,
         scene_repo: Arc<dyn SceneRepository>,
         song_repo: Arc<dyn SongRepository>,
+        movie_repo: Arc<dyn MovieRepository>,
     ) -> Self {
         Self {
             track_repo,
             scene_repo,
             song_repo,
+            movie_repo,
         }
     }
+
+    // ========================================================================
+    // Authorization helpers
+    // ========================================================================
+
+    /// Assert the actor is a movie team member with a write role,
+    /// resolving scene → movie.
+    async fn assert_movie_team(
+        &self,
+        scene_id: &crate::kernel::SceneId,
+        actor: &UserId,
+    ) -> Result<(), AppError> {
+        let scene = self
+            .scene_repo
+            .get_by_id(scene_id)
+            .await?
+            .ok_or_else(|| AppError::not_found("Scene not found"))?;
+
+        let member = self.movie_repo.get_member(&scene.movie_id, actor).await?;
+        match member {
+            Some(m) if m.role != MovieRole::Viewer => Ok(()),
+            _ => Err(TrackError::not_authorized()),
+        }
+    }
+
+    // ========================================================================
+    // CRUD
+    // ========================================================================
 
     pub async fn create_track(
         &self,
@@ -41,6 +73,8 @@ impl TrackService {
             .get_by_id(&req.scene_id)
             .await?
             .ok_or_else(|| AppError::not_found("Scene not found"))?;
+
+        self.assert_movie_team(&req.scene_id, &created_by).await?;
 
         self.song_repo
             .get_by_id(&req.song_id)
@@ -89,10 +123,14 @@ impl TrackService {
         &self,
         id: &TrackId,
         req: UpdateTrackRequest,
+        actor: &UserId,
     ) -> Result<Track, AppError> {
         let new_usage = req.validate()?;
 
-        let mut track = self.get_track(id).await?;
+        let track = self.get_track(id).await?;
+        self.assert_movie_team(&track.scene_id, actor).await?;
+
+        let mut track = track;
 
         if let Some(usage_type) = new_usage {
             track.usage_type = usage_type;
@@ -106,8 +144,9 @@ impl TrackService {
         Ok(track)
     }
 
-    pub async fn delete_track(&self, id: &TrackId) -> Result<(), AppError> {
-        self.get_track(id).await?;
+    pub async fn delete_track(&self, id: &TrackId, actor: &UserId) -> Result<(), AppError> {
+        let track = self.get_track(id).await?;
+        self.assert_movie_team(&track.scene_id, actor).await?;
         self.track_repo.delete(id).await
     }
 }
@@ -117,8 +156,10 @@ mod tests {
     use super::*;
     use crate::kernel::{LabelId, MovieId, SceneId, SongId, UserId};
     use crate::kernel::{Paginated, PaginationOptions};
+    use crate::movie::{Movie, MovieFilter, MovieMember, MovieRepository, MovieRole};
     use crate::scene::{Scene, SceneRepository};
     use crate::song::{Song, SongFilter, SongRepository};
+    use chrono::Utc as ChronoUtc;
     use tokio::sync::Mutex;
 
     // ========================================================================
@@ -265,8 +306,84 @@ mod tests {
         }
     }
 
-    fn make_scene() -> Scene {
-        Scene::new(MovieId::new(), "Opening".into(), 1, 0, 120)
+    struct MockMovieRepo {
+        members: Mutex<Vec<MovieMember>>,
+    }
+    impl MockMovieRepo {
+        fn new() -> Self {
+            Self {
+                members: Mutex::new(Vec::new()),
+            }
+        }
+        fn with_owner(movie_id: MovieId, owner_id: UserId) -> Self {
+            Self {
+                members: Mutex::new(vec![MovieMember {
+                    movie_id,
+                    user_id: owner_id,
+                    role: MovieRole::Owner,
+                    joined_at: ChronoUtc::now(),
+                }]),
+            }
+        }
+    }
+    #[async_trait::async_trait]
+    impl MovieRepository for MockMovieRepo {
+        async fn save(&self, _: &Movie) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn save_with_owner(&self, _: &Movie, _: &MovieMember) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn get_by_id(&self, _: &MovieId) -> Result<Option<Movie>, AppError> {
+            Ok(None)
+        }
+        async fn find(
+            &self,
+            _: &PaginationOptions,
+            _: &MovieFilter,
+        ) -> Result<Paginated<Movie>, AppError> {
+            Ok(Paginated::new(vec![], 1, 10, 0))
+        }
+        async fn update(&self, _: &Movie) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn delete(&self, _: &MovieId) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn list_by_user(&self, _: &UserId) -> Result<Vec<Movie>, AppError> {
+            Ok(vec![])
+        }
+        async fn add_member(&self, _: &MovieMember) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn remove_member(&self, _: &MovieId, _: &UserId) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn get_member(
+            &self,
+            movie_id: &MovieId,
+            user_id: &UserId,
+        ) -> Result<Option<MovieMember>, AppError> {
+            Ok(self
+                .members
+                .lock()
+                .await
+                .iter()
+                .find(|m| m.movie_id == *movie_id && m.user_id == *user_id)
+                .cloned())
+        }
+        async fn list_members(&self, _: &MovieId) -> Result<Vec<MovieMember>, AppError> {
+            Ok(vec![])
+        }
+        async fn get_user_movies(&self, _: &UserId) -> Result<Vec<Movie>, AppError> {
+            Ok(vec![])
+        }
+    }
+
+    fn make_scene() -> (Scene, MovieId) {
+        let movie_id = MovieId::new();
+        let scene = Scene::new(movie_id.clone(), "Opening".into(), 1, 0, 120);
+        (scene, movie_id)
     }
 
     fn make_song() -> Song {
@@ -277,11 +394,13 @@ mod tests {
         track_repo: MockTrackRepo,
         scene_repo: MockSceneRepo,
         song_repo: MockSongRepo,
+        movie_repo: MockMovieRepo,
     ) -> TrackService {
         TrackService::new(
             Arc::new(track_repo),
             Arc::new(scene_repo),
             Arc::new(song_repo),
+            Arc::new(movie_repo),
         )
     }
 
@@ -300,15 +419,17 @@ mod tests {
 
     #[tokio::test]
     async fn create_track_success() {
-        let scene = make_scene();
+        let (scene, movie_id) = make_scene();
         let song = make_song();
+        let owner_id = UserId::new();
         let svc = make_svc(
             MockTrackRepo::new(),
             MockSceneRepo::with_scene(scene.clone()),
             MockSongRepo::with_song(song.clone()),
+            MockMovieRepo::with_owner(movie_id, owner_id.clone()),
         );
         let track = svc
-            .create_track(create_req(scene.id.clone(), song.id.clone()), UserId::new())
+            .create_track(create_req(scene.id.clone(), song.id.clone()), owner_id)
             .await
             .unwrap();
         assert_eq!(track.scene_id, scene.id);
@@ -319,46 +440,52 @@ mod tests {
 
     #[tokio::test]
     async fn create_track_with_notes() {
-        let scene = make_scene();
+        let (scene, movie_id) = make_scene();
         let song = make_song();
+        let owner_id = UserId::new();
         let svc = make_svc(
             MockTrackRepo::new(),
             MockSceneRepo::with_scene(scene.clone()),
             MockSongRepo::with_song(song.clone()),
+            MockMovieRepo::with_owner(movie_id, owner_id.clone()),
         );
         let mut req = create_req(scene.id.clone(), song.id.clone());
         req.notes = Some("Plays softly in background".into());
-        let track = svc.create_track(req, UserId::new()).await.unwrap();
+        let track = svc.create_track(req, owner_id).await.unwrap();
         assert_eq!(track.notes.as_deref(), Some("Plays softly in background"));
     }
 
     #[tokio::test]
     async fn create_track_featured_usage() {
-        let scene = make_scene();
+        let (scene, movie_id) = make_scene();
         let song = make_song();
+        let owner_id = UserId::new();
         let svc = make_svc(
             MockTrackRepo::new(),
             MockSceneRepo::with_scene(scene.clone()),
             MockSongRepo::with_song(song.clone()),
+            MockMovieRepo::with_owner(movie_id, owner_id.clone()),
         );
         let mut req = create_req(scene.id.clone(), song.id.clone());
         req.usage_type = "FEATURED".into();
-        let track = svc.create_track(req, UserId::new()).await.unwrap();
+        let track = svc.create_track(req, owner_id).await.unwrap();
         assert_eq!(track.usage_type, super::super::model::UsageType::Featured);
     }
 
     #[tokio::test]
     async fn create_track_invalid_usage_type() {
-        let scene = make_scene();
+        let (scene, movie_id) = make_scene();
         let song = make_song();
+        let owner_id = UserId::new();
         let svc = make_svc(
             MockTrackRepo::new(),
             MockSceneRepo::with_scene(scene.clone()),
             MockSongRepo::with_song(song.clone()),
+            MockMovieRepo::with_owner(movie_id, owner_id.clone()),
         );
         let mut req = create_req(scene.id.clone(), song.id.clone());
         req.usage_type = "INVALID".into();
-        let err = svc.create_track(req, UserId::new()).await.unwrap_err();
+        let err = svc.create_track(req, owner_id).await.unwrap_err();
         assert_eq!(err.code, "VALIDATION_ERROR");
     }
 
@@ -369,6 +496,7 @@ mod tests {
             MockTrackRepo::new(),
             MockSceneRepo::new(),
             MockSongRepo::with_song(song.clone()),
+            MockMovieRepo::new(),
         );
         let err = svc
             .create_track(create_req(SceneId::new(), song.id.clone()), UserId::new())
@@ -379,14 +507,16 @@ mod tests {
 
     #[tokio::test]
     async fn create_track_song_not_found() {
-        let scene = make_scene();
+        let (scene, movie_id) = make_scene();
+        let owner_id = UserId::new();
         let svc = make_svc(
             MockTrackRepo::new(),
             MockSceneRepo::with_scene(scene.clone()),
             MockSongRepo::new(),
+            MockMovieRepo::with_owner(movie_id, owner_id.clone()),
         );
         let err = svc
-            .create_track(create_req(scene.id.clone(), SongId::new()), UserId::new())
+            .create_track(create_req(scene.id.clone(), SongId::new()), owner_id)
             .await
             .unwrap_err();
         assert_eq!(err.code, "NOT_FOUND");
@@ -394,18 +524,23 @@ mod tests {
 
     #[tokio::test]
     async fn create_track_duplicate_song_in_scene() {
-        let scene = make_scene();
+        let (scene, movie_id) = make_scene();
         let song = make_song();
+        let owner_id = UserId::new();
         let svc = make_svc(
             MockTrackRepo::new(),
             MockSceneRepo::with_scene(scene.clone()),
             MockSongRepo::with_song(song.clone()),
+            MockMovieRepo::with_owner(movie_id, owner_id.clone()),
         );
-        svc.create_track(create_req(scene.id.clone(), song.id.clone()), UserId::new())
-            .await
-            .unwrap();
+        svc.create_track(
+            create_req(scene.id.clone(), song.id.clone()),
+            owner_id.clone(),
+        )
+        .await
+        .unwrap();
         let err = svc
-            .create_track(create_req(scene.id.clone(), song.id.clone()), UserId::new())
+            .create_track(create_req(scene.id.clone(), song.id.clone()), owner_id)
             .await
             .unwrap_err();
         assert_eq!(err.code, "track.already_exists");
@@ -417,15 +552,17 @@ mod tests {
 
     #[tokio::test]
     async fn get_track_success() {
-        let scene = make_scene();
+        let (scene, movie_id) = make_scene();
         let song = make_song();
+        let owner_id = UserId::new();
         let svc = make_svc(
             MockTrackRepo::new(),
             MockSceneRepo::with_scene(scene.clone()),
             MockSongRepo::with_song(song.clone()),
+            MockMovieRepo::with_owner(movie_id, owner_id.clone()),
         );
         let created = svc
-            .create_track(create_req(scene.id.clone(), song.id.clone()), UserId::new())
+            .create_track(create_req(scene.id.clone(), song.id.clone()), owner_id)
             .await
             .unwrap();
         let found = svc.get_track(&created.id).await.unwrap();
@@ -438,6 +575,7 @@ mod tests {
             MockTrackRepo::new(),
             MockSceneRepo::new(),
             MockSongRepo::new(),
+            MockMovieRepo::new(),
         );
         let err = svc.get_track(&TrackId::new()).await.unwrap_err();
         assert_eq!(err.code, "track.not_found");
@@ -449,9 +587,10 @@ mod tests {
 
     #[tokio::test]
     async fn list_by_scene_success() {
-        let scene = make_scene();
+        let (scene, movie_id) = make_scene();
         let song1 = make_song();
         let song2 = make_song();
+        let owner_id = UserId::new();
         let song_repo = MockSongRepo {
             songs: Mutex::new(vec![song1.clone(), song2.clone()]),
         };
@@ -459,16 +598,17 @@ mod tests {
             MockTrackRepo::new(),
             MockSceneRepo::with_scene(scene.clone()),
             song_repo,
+            MockMovieRepo::with_owner(movie_id, owner_id.clone()),
         );
         svc.create_track(
             create_req(scene.id.clone(), song1.id.clone()),
-            UserId::new(),
+            owner_id.clone(),
         )
         .await
         .unwrap();
         let mut req2 = create_req(scene.id.clone(), song2.id.clone());
         req2.usage_type = "CREDITS".into();
-        svc.create_track(req2, UserId::new()).await.unwrap();
+        svc.create_track(req2, owner_id).await.unwrap();
 
         let tracks = svc.list_by_scene(&scene.id).await.unwrap();
         assert_eq!(tracks.len(), 2);
@@ -476,29 +616,41 @@ mod tests {
 
     #[tokio::test]
     async fn list_by_song_success() {
-        let scene1 = make_scene();
-        let scene2 = make_scene();
+        let (scene1, movie_id1) = make_scene();
+        let (scene2, movie_id2) = make_scene();
         let song = make_song();
+        let owner_id = UserId::new();
         let scene_repo = MockSceneRepo {
             scenes: Mutex::new(vec![scene1.clone(), scene2.clone()]),
         };
+        let movie_repo = MockMovieRepo::new();
+        movie_repo.members.lock().await.push(MovieMember {
+            movie_id: movie_id1,
+            user_id: owner_id.clone(),
+            role: MovieRole::Owner,
+            joined_at: ChronoUtc::now(),
+        });
+        movie_repo.members.lock().await.push(MovieMember {
+            movie_id: movie_id2,
+            user_id: owner_id.clone(),
+            role: MovieRole::Owner,
+            joined_at: ChronoUtc::now(),
+        });
         let svc = make_svc(
             MockTrackRepo::new(),
             scene_repo,
             MockSongRepo::with_song(song.clone()),
+            movie_repo,
         );
         svc.create_track(
             create_req(scene1.id.clone(), song.id.clone()),
-            UserId::new(),
+            owner_id.clone(),
         )
         .await
         .unwrap();
-        svc.create_track(
-            create_req(scene2.id.clone(), song.id.clone()),
-            UserId::new(),
-        )
-        .await
-        .unwrap();
+        svc.create_track(create_req(scene2.id.clone(), song.id.clone()), owner_id)
+            .await
+            .unwrap();
 
         let tracks = svc.list_by_song(&song.id).await.unwrap();
         assert_eq!(tracks.len(), 2);
@@ -510,6 +662,7 @@ mod tests {
             MockTrackRepo::new(),
             MockSceneRepo::new(),
             MockSongRepo::new(),
+            MockMovieRepo::new(),
         );
         let tracks = svc.list_by_scene(&SceneId::new()).await.unwrap();
         assert!(tracks.is_empty());
@@ -521,15 +674,20 @@ mod tests {
 
     #[tokio::test]
     async fn update_track_usage_type() {
-        let scene = make_scene();
+        let (scene, movie_id) = make_scene();
         let song = make_song();
+        let owner_id = UserId::new();
         let svc = make_svc(
             MockTrackRepo::new(),
             MockSceneRepo::with_scene(scene.clone()),
             MockSongRepo::with_song(song.clone()),
+            MockMovieRepo::with_owner(movie_id, owner_id.clone()),
         );
         let created = svc
-            .create_track(create_req(scene.id.clone(), song.id.clone()), UserId::new())
+            .create_track(
+                create_req(scene.id.clone(), song.id.clone()),
+                owner_id.clone(),
+            )
             .await
             .unwrap();
         let updated = svc
@@ -539,6 +697,7 @@ mod tests {
                     usage_type: Some("FEATURED".into()),
                     notes: None,
                 },
+                &owner_id,
             )
             .await
             .unwrap();
@@ -547,15 +706,20 @@ mod tests {
 
     #[tokio::test]
     async fn update_track_notes() {
-        let scene = make_scene();
+        let (scene, movie_id) = make_scene();
         let song = make_song();
+        let owner_id = UserId::new();
         let svc = make_svc(
             MockTrackRepo::new(),
             MockSceneRepo::with_scene(scene.clone()),
             MockSongRepo::with_song(song.clone()),
+            MockMovieRepo::with_owner(movie_id, owner_id.clone()),
         );
         let created = svc
-            .create_track(create_req(scene.id.clone(), song.id.clone()), UserId::new())
+            .create_track(
+                create_req(scene.id.clone(), song.id.clone()),
+                owner_id.clone(),
+            )
             .await
             .unwrap();
         let updated = svc
@@ -565,6 +729,7 @@ mod tests {
                     usage_type: None,
                     notes: Some("Loud during chase".into()),
                 },
+                &owner_id,
             )
             .await
             .unwrap();
@@ -581,7 +746,9 @@ mod tests {
             MockTrackRepo::new(),
             MockSceneRepo::new(),
             MockSongRepo::new(),
+            MockMovieRepo::new(),
         );
+        let actor = UserId::new();
         let err = svc
             .update_track(
                 &TrackId::new(),
@@ -589,6 +756,7 @@ mod tests {
                     usage_type: Some("FEATURED".into()),
                     notes: None,
                 },
+                &actor,
             )
             .await
             .unwrap_err();
@@ -597,15 +765,20 @@ mod tests {
 
     #[tokio::test]
     async fn update_track_invalid_usage_type() {
-        let scene = make_scene();
+        let (scene, movie_id) = make_scene();
         let song = make_song();
+        let owner_id = UserId::new();
         let svc = make_svc(
             MockTrackRepo::new(),
             MockSceneRepo::with_scene(scene.clone()),
             MockSongRepo::with_song(song.clone()),
+            MockMovieRepo::with_owner(movie_id, owner_id.clone()),
         );
         let created = svc
-            .create_track(create_req(scene.id.clone(), song.id.clone()), UserId::new())
+            .create_track(
+                create_req(scene.id.clone(), song.id.clone()),
+                owner_id.clone(),
+            )
             .await
             .unwrap();
         let err = svc
@@ -615,6 +788,7 @@ mod tests {
                     usage_type: Some("NOPE".into()),
                     notes: None,
                 },
+                &owner_id,
             )
             .await
             .unwrap_err();
@@ -627,18 +801,23 @@ mod tests {
 
     #[tokio::test]
     async fn delete_track_success() {
-        let scene = make_scene();
+        let (scene, movie_id) = make_scene();
         let song = make_song();
+        let owner_id = UserId::new();
         let svc = make_svc(
             MockTrackRepo::new(),
             MockSceneRepo::with_scene(scene.clone()),
             MockSongRepo::with_song(song.clone()),
+            MockMovieRepo::with_owner(movie_id, owner_id.clone()),
         );
         let created = svc
-            .create_track(create_req(scene.id.clone(), song.id.clone()), UserId::new())
+            .create_track(
+                create_req(scene.id.clone(), song.id.clone()),
+                owner_id.clone(),
+            )
             .await
             .unwrap();
-        svc.delete_track(&created.id).await.unwrap();
+        svc.delete_track(&created.id, &owner_id).await.unwrap();
         let err = svc.get_track(&created.id).await.unwrap_err();
         assert_eq!(err.code, "track.not_found");
     }
@@ -649,8 +828,109 @@ mod tests {
             MockTrackRepo::new(),
             MockSceneRepo::new(),
             MockSongRepo::new(),
+            MockMovieRepo::new(),
         );
-        let err = svc.delete_track(&TrackId::new()).await.unwrap_err();
+        let actor = UserId::new();
+        let err = svc.delete_track(&TrackId::new(), &actor).await.unwrap_err();
         assert_eq!(err.code, "track.not_found");
+    }
+
+    // ========================================================================
+    // Authorization
+    // ========================================================================
+
+    #[tokio::test]
+    async fn create_track_non_member_denied() {
+        let (scene, _movie_id) = make_scene();
+        let song = make_song();
+        let svc = make_svc(
+            MockTrackRepo::new(),
+            MockSceneRepo::with_scene(scene.clone()),
+            MockSongRepo::with_song(song.clone()),
+            MockMovieRepo::new(), // no members
+        );
+        let outsider = UserId::new();
+        let err = svc
+            .create_track(create_req(scene.id.clone(), song.id.clone()), outsider)
+            .await
+            .unwrap_err();
+        assert_eq!(err.code, "track.not_authorized");
+    }
+
+    #[tokio::test]
+    async fn create_track_viewer_denied() {
+        let (scene, movie_id) = make_scene();
+        let song = make_song();
+        let viewer_id = UserId::new();
+        let movie_repo = MockMovieRepo::new();
+        movie_repo.members.lock().await.push(MovieMember {
+            movie_id,
+            user_id: viewer_id.clone(),
+            role: MovieRole::Viewer,
+            joined_at: ChronoUtc::now(),
+        });
+        let svc = make_svc(
+            MockTrackRepo::new(),
+            MockSceneRepo::with_scene(scene.clone()),
+            MockSongRepo::with_song(song.clone()),
+            movie_repo,
+        );
+        let err = svc
+            .create_track(create_req(scene.id.clone(), song.id.clone()), viewer_id)
+            .await
+            .unwrap_err();
+        assert_eq!(err.code, "track.not_authorized");
+    }
+
+    #[tokio::test]
+    async fn update_track_non_member_denied() {
+        let (scene, movie_id) = make_scene();
+        let song = make_song();
+        let owner_id = UserId::new();
+        let svc = make_svc(
+            MockTrackRepo::new(),
+            MockSceneRepo::with_scene(scene.clone()),
+            MockSongRepo::with_song(song.clone()),
+            MockMovieRepo::with_owner(movie_id, owner_id.clone()),
+        );
+        let created = svc
+            .create_track(create_req(scene.id.clone(), song.id.clone()), owner_id)
+            .await
+            .unwrap();
+
+        let outsider = UserId::new();
+        let err = svc
+            .update_track(
+                &created.id,
+                UpdateTrackRequest {
+                    usage_type: Some("FEATURED".into()),
+                    notes: None,
+                },
+                &outsider,
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(err.code, "track.not_authorized");
+    }
+
+    #[tokio::test]
+    async fn delete_track_non_member_denied() {
+        let (scene, movie_id) = make_scene();
+        let song = make_song();
+        let owner_id = UserId::new();
+        let svc = make_svc(
+            MockTrackRepo::new(),
+            MockSceneRepo::with_scene(scene.clone()),
+            MockSongRepo::with_song(song.clone()),
+            MockMovieRepo::with_owner(movie_id, owner_id.clone()),
+        );
+        let created = svc
+            .create_track(create_req(scene.id.clone(), song.id.clone()), owner_id)
+            .await
+            .unwrap();
+
+        let outsider = UserId::new();
+        let err = svc.delete_track(&created.id, &outsider).await.unwrap_err();
+        assert_eq!(err.code, "track.not_authorized");
     }
 }

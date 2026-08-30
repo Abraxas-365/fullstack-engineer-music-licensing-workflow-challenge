@@ -4,9 +4,9 @@ use std::sync::Arc;
 
 use backend::iam::user::adapters::{BcryptPasswordService, PostgresUserRepository};
 use backend::iam::user::{PasswordService, User, UserRepository};
-use backend::kernel::{MovieId, SceneId};
+use backend::kernel::{MovieId, SceneId, UserId};
 use backend::movie::adapters::PostgresMovieRepository;
-use backend::movie::{Movie, MovieRepository};
+use backend::movie::{Movie, MovieMember, MovieRepository, MovieRole};
 use backend::scene::adapters::PostgresSceneRepository;
 use backend::scene::{
     CreateSceneRequest, Scene, SceneRepository, SceneService, UpdateSceneRequest,
@@ -51,11 +51,18 @@ impl TestContext {
         user
     }
 
-    async fn create_movie(&self) -> Movie {
+    async fn create_movie(&self) -> (Movie, User) {
         let user = self.create_user().await;
         let movie = Movie::new("Test Movie".into(), user.id.clone());
+        let owner = MovieMember {
+            movie_id: movie.id.clone(),
+            user_id: user.id.clone(),
+            role: MovieRole::Owner,
+            joined_at: movie.created_at,
+        };
         self.movie_repo.save(&movie).await.unwrap();
-        movie
+        self.movie_repo.add_member(&owner).await.unwrap();
+        (movie, user)
     }
 
     fn create_req(&self, movie_id: MovieId) -> CreateSceneRequest {
@@ -77,7 +84,7 @@ impl TestContext {
 #[tokio::test]
 async fn test_repo_save_and_get_by_id() {
     let ctx = TestContext::new().await;
-    let movie = ctx.create_movie().await;
+    let (movie, _user) = ctx.create_movie().await;
 
     let mut scene = Scene::new(movie.id.clone(), "Chase".into(), 1, 0, 300);
     scene.description = Some("Car chase".into());
@@ -102,7 +109,7 @@ async fn test_repo_get_by_id_not_found() {
 #[tokio::test]
 async fn test_repo_update() {
     let ctx = TestContext::new().await;
-    let movie = ctx.create_movie().await;
+    let (movie, _user) = ctx.create_movie().await;
 
     let mut scene = Scene::new(movie.id.clone(), "Old".into(), 1, 0, 60);
     ctx.scene_repo.save(&scene).await.unwrap();
@@ -123,7 +130,7 @@ async fn test_repo_update() {
 #[tokio::test]
 async fn test_repo_delete() {
     let ctx = TestContext::new().await;
-    let movie = ctx.create_movie().await;
+    let (movie, _user) = ctx.create_movie().await;
 
     let scene = Scene::new(movie.id.clone(), "Delete Me".into(), 1, 0, 60);
     ctx.scene_repo.save(&scene).await.unwrap();
@@ -135,7 +142,7 @@ async fn test_repo_delete() {
 #[tokio::test]
 async fn test_repo_list_by_movie() {
     let ctx = TestContext::new().await;
-    let movie = ctx.create_movie().await;
+    let (movie, _user) = ctx.create_movie().await;
 
     ctx.scene_repo
         .save(&Scene::new(movie.id.clone(), "S1".into(), 1, 0, 60))
@@ -156,7 +163,7 @@ async fn test_repo_list_by_movie() {
 #[tokio::test]
 async fn test_repo_list_by_movie_ordered() {
     let ctx = TestContext::new().await;
-    let movie = ctx.create_movie().await;
+    let (movie, _user) = ctx.create_movie().await;
 
     // Insert in reverse order
     ctx.scene_repo
@@ -185,11 +192,11 @@ async fn test_repo_list_by_movie_ordered() {
 #[tokio::test]
 async fn test_service_create_scene() {
     let ctx = TestContext::new().await;
-    let movie = ctx.create_movie().await;
+    let (movie, user) = ctx.create_movie().await;
 
     let scene = ctx
         .scene_svc
-        .create_scene(ctx.create_req(movie.id.clone()))
+        .create_scene(ctx.create_req(movie.id.clone()), &user.id)
         .await
         .unwrap();
 
@@ -203,9 +210,10 @@ async fn test_service_create_scene() {
 #[tokio::test]
 async fn test_service_create_scene_movie_not_found() {
     let ctx = TestContext::new().await;
+    let actor = UserId::new();
     let err = ctx
         .scene_svc
-        .create_scene(ctx.create_req(MovieId::new()))
+        .create_scene(ctx.create_req(MovieId::new()), &actor)
         .await
         .unwrap_err();
     assert_eq!(err.code, "NOT_FOUND");
@@ -214,21 +222,21 @@ async fn test_service_create_scene_movie_not_found() {
 #[tokio::test]
 async fn test_service_create_scene_empty_title() {
     let ctx = TestContext::new().await;
-    let movie = ctx.create_movie().await;
+    let (movie, user) = ctx.create_movie().await;
     let mut req = ctx.create_req(movie.id.clone());
     req.title = "  ".into();
-    let err = ctx.scene_svc.create_scene(req).await.unwrap_err();
+    let err = ctx.scene_svc.create_scene(req, &user.id).await.unwrap_err();
     assert_eq!(err.code, "VALIDATION_ERROR");
 }
 
 #[tokio::test]
 async fn test_service_create_scene_end_before_start() {
     let ctx = TestContext::new().await;
-    let movie = ctx.create_movie().await;
+    let (movie, user) = ctx.create_movie().await;
     let mut req = ctx.create_req(movie.id.clone());
     req.start_time = 200;
     req.end_time = 100;
-    let err = ctx.scene_svc.create_scene(req).await.unwrap_err();
+    let err = ctx.scene_svc.create_scene(req, &user.id).await.unwrap_err();
     assert_eq!(err.code, "VALIDATION_ERROR");
 }
 
@@ -239,10 +247,10 @@ async fn test_service_create_scene_end_before_start() {
 #[tokio::test]
 async fn test_service_get_scene() {
     let ctx = TestContext::new().await;
-    let movie = ctx.create_movie().await;
+    let (movie, user) = ctx.create_movie().await;
     let created = ctx
         .scene_svc
-        .create_scene(ctx.create_req(movie.id.clone()))
+        .create_scene(ctx.create_req(movie.id.clone()), &user.id)
         .await
         .unwrap();
     let found = ctx.scene_svc.get_scene(&created.id).await.unwrap();
@@ -259,10 +267,10 @@ async fn test_service_get_scene_not_found() {
 #[tokio::test]
 async fn test_service_list_by_movie() {
     let ctx = TestContext::new().await;
-    let movie = ctx.create_movie().await;
+    let (movie, user) = ctx.create_movie().await;
 
     ctx.scene_svc
-        .create_scene(ctx.create_req(movie.id.clone()))
+        .create_scene(ctx.create_req(movie.id.clone()), &user.id)
         .await
         .unwrap();
 
@@ -271,7 +279,7 @@ async fn test_service_list_by_movie() {
     req2.scene_number = 2;
     req2.start_time = 120;
     req2.end_time = 300;
-    ctx.scene_svc.create_scene(req2).await.unwrap();
+    ctx.scene_svc.create_scene(req2, &user.id).await.unwrap();
 
     let scenes = ctx.scene_svc.list_by_movie(&movie.id).await.unwrap();
     assert_eq!(scenes.len(), 2);
@@ -284,10 +292,10 @@ async fn test_service_list_by_movie() {
 #[tokio::test]
 async fn test_service_update_scene() {
     let ctx = TestContext::new().await;
-    let movie = ctx.create_movie().await;
+    let (movie, user) = ctx.create_movie().await;
     let scene = ctx
         .scene_svc
-        .create_scene(ctx.create_req(movie.id.clone()))
+        .create_scene(ctx.create_req(movie.id.clone()), &user.id)
         .await
         .unwrap();
 
@@ -302,6 +310,7 @@ async fn test_service_update_scene() {
                 start_time: Some(3600),
                 end_time: Some(4200),
             },
+            &user.id,
         )
         .await
         .unwrap();
@@ -315,10 +324,10 @@ async fn test_service_update_scene() {
 #[tokio::test]
 async fn test_service_update_scene_partial() {
     let ctx = TestContext::new().await;
-    let movie = ctx.create_movie().await;
+    let (movie, user) = ctx.create_movie().await;
     let scene = ctx
         .scene_svc
-        .create_scene(ctx.create_req(movie.id.clone()))
+        .create_scene(ctx.create_req(movie.id.clone()), &user.id)
         .await
         .unwrap();
 
@@ -333,6 +342,7 @@ async fn test_service_update_scene_partial() {
                 start_time: None,
                 end_time: None,
             },
+            &user.id,
         )
         .await
         .unwrap();
@@ -345,6 +355,7 @@ async fn test_service_update_scene_partial() {
 #[tokio::test]
 async fn test_service_update_scene_not_found() {
     let ctx = TestContext::new().await;
+    let actor = UserId::new();
     let err = ctx
         .scene_svc
         .update_scene(
@@ -356,6 +367,7 @@ async fn test_service_update_scene_not_found() {
                 start_time: None,
                 end_time: None,
             },
+            &actor,
         )
         .await
         .unwrap_err();
@@ -369,13 +381,16 @@ async fn test_service_update_scene_not_found() {
 #[tokio::test]
 async fn test_service_delete_scene() {
     let ctx = TestContext::new().await;
-    let movie = ctx.create_movie().await;
+    let (movie, user) = ctx.create_movie().await;
     let scene = ctx
         .scene_svc
-        .create_scene(ctx.create_req(movie.id.clone()))
+        .create_scene(ctx.create_req(movie.id.clone()), &user.id)
         .await
         .unwrap();
-    ctx.scene_svc.delete_scene(&scene.id).await.unwrap();
+    ctx.scene_svc
+        .delete_scene(&scene.id, &user.id)
+        .await
+        .unwrap();
     let err = ctx.scene_svc.get_scene(&scene.id).await.unwrap_err();
     assert_eq!(err.code, "scene.not_found");
 }
@@ -383,9 +398,10 @@ async fn test_service_delete_scene() {
 #[tokio::test]
 async fn test_service_delete_scene_not_found() {
     let ctx = TestContext::new().await;
+    let actor = UserId::new();
     let err = ctx
         .scene_svc
-        .delete_scene(&SceneId::new())
+        .delete_scene(&SceneId::new(), &actor)
         .await
         .unwrap_err();
     assert_eq!(err.code, "scene.not_found");
@@ -398,10 +414,10 @@ async fn test_service_delete_scene_not_found() {
 #[tokio::test]
 async fn test_delete_movie_cascades_scenes() {
     let ctx = TestContext::new().await;
-    let movie = ctx.create_movie().await;
+    let (movie, user) = ctx.create_movie().await;
 
     ctx.scene_svc
-        .create_scene(ctx.create_req(movie.id.clone()))
+        .create_scene(ctx.create_req(movie.id.clone()), &user.id)
         .await
         .unwrap();
 

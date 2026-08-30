@@ -3,8 +3,8 @@ use std::sync::Arc;
 use chrono::Utc;
 
 use crate::error::AppError;
-use crate::kernel::SceneId;
-use crate::movie::MovieRepository;
+use crate::kernel::{SceneId, UserId};
+use crate::movie::{MovieRepository, MovieRole};
 
 use super::error::SceneError;
 use super::model::{CreateSceneRequest, Scene, UpdateSceneRequest};
@@ -23,13 +23,41 @@ impl SceneService {
         }
     }
 
-    pub async fn create_scene(&self, req: CreateSceneRequest) -> Result<Scene, AppError> {
+    // ========================================================================
+    // Authorization helpers
+    // ========================================================================
+
+    /// Assert the actor is a movie team member with a write role
+    /// (Owner, Supervisor, or Editor — not Viewer).
+    async fn assert_movie_team(
+        &self,
+        movie_id: &crate::kernel::MovieId,
+        actor: &UserId,
+    ) -> Result<(), AppError> {
+        let member = self.movie_repo.get_member(movie_id, actor).await?;
+        match member {
+            Some(m) if m.role != MovieRole::Viewer => Ok(()),
+            _ => Err(SceneError::not_authorized()),
+        }
+    }
+
+    // ========================================================================
+    // CRUD
+    // ========================================================================
+
+    pub async fn create_scene(
+        &self,
+        req: CreateSceneRequest,
+        actor: &UserId,
+    ) -> Result<Scene, AppError> {
         req.validate()?;
 
         self.movie_repo
             .get_by_id(&req.movie_id)
             .await?
             .ok_or_else(|| AppError::not_found("Movie not found"))?;
+
+        self.assert_movie_team(&req.movie_id, actor).await?;
 
         let mut scene = Scene::new(
             req.movie_id,
@@ -62,10 +90,14 @@ impl SceneService {
         &self,
         id: &SceneId,
         req: UpdateSceneRequest,
+        actor: &UserId,
     ) -> Result<Scene, AppError> {
         req.validate()?;
 
-        let mut scene = self.get_scene(id).await?;
+        let scene = self.get_scene(id).await?;
+        self.assert_movie_team(&scene.movie_id, actor).await?;
+
+        let mut scene = scene;
 
         if let Some(title) = req.title {
             scene.title = title;
@@ -94,8 +126,9 @@ impl SceneService {
         Ok(scene)
     }
 
-    pub async fn delete_scene(&self, id: &SceneId) -> Result<(), AppError> {
-        self.get_scene(id).await?;
+    pub async fn delete_scene(&self, id: &SceneId, actor: &UserId) -> Result<(), AppError> {
+        let scene = self.get_scene(id).await?;
+        self.assert_movie_team(&scene.movie_id, actor).await?;
         self.scene_repo.delete(id).await
     }
 }
@@ -104,7 +137,8 @@ impl SceneService {
 mod tests {
     use super::*;
     use crate::kernel::{MovieId, Paginated, PaginationOptions, UserId};
-    use crate::movie::{Movie, MovieMember, MovieRepository};
+    use crate::movie::{Movie, MovieMember, MovieRepository, MovieRole};
+    use chrono::Utc as ChronoUtc;
     use tokio::sync::Mutex;
 
     // ========================================================================
@@ -161,16 +195,25 @@ mod tests {
 
     struct MockMovieRepo {
         movies: Mutex<Vec<Movie>>,
+        members: Mutex<Vec<MovieMember>>,
     }
     impl MockMovieRepo {
         fn new() -> Self {
             Self {
                 movies: Mutex::new(Vec::new()),
+                members: Mutex::new(Vec::new()),
             }
         }
-        fn with_movie(movie: Movie) -> Self {
+        fn with_movie_and_owner(movie: Movie, owner_id: UserId) -> Self {
+            let member = MovieMember {
+                movie_id: movie.id.clone(),
+                user_id: owner_id,
+                role: MovieRole::Owner,
+                joined_at: ChronoUtc::now(),
+            };
             Self {
                 movies: Mutex::new(vec![movie]),
+                members: Mutex::new(vec![member]),
             }
         }
     }
@@ -210,10 +253,16 @@ mod tests {
         }
         async fn get_member(
             &self,
-            _: &MovieId,
-            _: &UserId,
+            movie_id: &MovieId,
+            user_id: &UserId,
         ) -> Result<Option<MovieMember>, AppError> {
-            Ok(None)
+            Ok(self
+                .members
+                .lock()
+                .await
+                .iter()
+                .find(|m| m.movie_id == *movie_id && m.user_id == *user_id)
+                .cloned())
         }
         async fn list_members(&self, _: &MovieId) -> Result<Vec<MovieMember>, AppError> {
             Ok(vec![])
@@ -223,8 +272,10 @@ mod tests {
         }
     }
 
-    fn make_movie() -> Movie {
-        Movie::new("Test Movie".into(), UserId::new())
+    fn make_movie() -> (Movie, UserId) {
+        let owner_id = UserId::new();
+        let movie = Movie::new("Test Movie".into(), owner_id.clone());
+        (movie, owner_id)
     }
 
     fn make_svc(scene_repo: MockSceneRepo, movie_repo: MockMovieRepo) -> SceneService {
@@ -248,13 +299,13 @@ mod tests {
 
     #[tokio::test]
     async fn create_scene_success() {
-        let movie = make_movie();
+        let (movie, owner_id) = make_movie();
         let svc = make_svc(
             MockSceneRepo::new(),
-            MockMovieRepo::with_movie(movie.clone()),
+            MockMovieRepo::with_movie_and_owner(movie.clone(), owner_id.clone()),
         );
         let scene = svc
-            .create_scene(create_req(movie.id.clone()))
+            .create_scene(create_req(movie.id.clone()), &owner_id)
             .await
             .unwrap();
         assert_eq!(scene.title, "Opening");
@@ -267,8 +318,9 @@ mod tests {
     #[tokio::test]
     async fn create_scene_movie_not_found() {
         let svc = make_svc(MockSceneRepo::new(), MockMovieRepo::new());
+        let actor = UserId::new();
         let err = svc
-            .create_scene(create_req(MovieId::new()))
+            .create_scene(create_req(MovieId::new()), &actor)
             .await
             .unwrap_err();
         assert_eq!(err.code, "NOT_FOUND");
@@ -276,68 +328,68 @@ mod tests {
 
     #[tokio::test]
     async fn create_scene_empty_title() {
-        let movie = make_movie();
+        let (movie, owner_id) = make_movie();
         let svc = make_svc(
             MockSceneRepo::new(),
-            MockMovieRepo::with_movie(movie.clone()),
+            MockMovieRepo::with_movie_and_owner(movie.clone(), owner_id.clone()),
         );
         let mut req = create_req(movie.id.clone());
         req.title = "  ".into();
-        let err = svc.create_scene(req).await.unwrap_err();
+        let err = svc.create_scene(req, &owner_id).await.unwrap_err();
         assert_eq!(err.code, "VALIDATION_ERROR");
     }
 
     #[tokio::test]
     async fn create_scene_invalid_scene_number() {
-        let movie = make_movie();
+        let (movie, owner_id) = make_movie();
         let svc = make_svc(
             MockSceneRepo::new(),
-            MockMovieRepo::with_movie(movie.clone()),
+            MockMovieRepo::with_movie_and_owner(movie.clone(), owner_id.clone()),
         );
         let mut req = create_req(movie.id.clone());
         req.scene_number = 0;
-        let err = svc.create_scene(req).await.unwrap_err();
+        let err = svc.create_scene(req, &owner_id).await.unwrap_err();
         assert_eq!(err.code, "VALIDATION_ERROR");
     }
 
     #[tokio::test]
     async fn create_scene_negative_start() {
-        let movie = make_movie();
+        let (movie, owner_id) = make_movie();
         let svc = make_svc(
             MockSceneRepo::new(),
-            MockMovieRepo::with_movie(movie.clone()),
+            MockMovieRepo::with_movie_and_owner(movie.clone(), owner_id.clone()),
         );
         let mut req = create_req(movie.id.clone());
         req.start_time = -1;
-        let err = svc.create_scene(req).await.unwrap_err();
+        let err = svc.create_scene(req, &owner_id).await.unwrap_err();
         assert_eq!(err.code, "VALIDATION_ERROR");
     }
 
     #[tokio::test]
     async fn create_scene_end_before_start() {
-        let movie = make_movie();
+        let (movie, owner_id) = make_movie();
         let svc = make_svc(
             MockSceneRepo::new(),
-            MockMovieRepo::with_movie(movie.clone()),
+            MockMovieRepo::with_movie_and_owner(movie.clone(), owner_id.clone()),
         );
         let mut req = create_req(movie.id.clone());
         req.start_time = 100;
         req.end_time = 50;
-        let err = svc.create_scene(req).await.unwrap_err();
+        let err = svc.create_scene(req, &owner_id).await.unwrap_err();
         assert_eq!(err.code, "VALIDATION_ERROR");
     }
 
     #[tokio::test]
     async fn create_scene_end_equals_start() {
-        let movie = make_movie();
+        let (movie, owner_id) = make_movie();
         let svc = make_svc(
             MockSceneRepo::new(),
-            MockMovieRepo::with_movie(movie.clone()),
+            MockMovieRepo::with_movie_and_owner(movie.clone(), owner_id.clone()),
         );
         let mut req = create_req(movie.id.clone());
         req.start_time = 100;
         req.end_time = 100;
-        let err = svc.create_scene(req).await.unwrap_err();
+        let err = svc.create_scene(req, &owner_id).await.unwrap_err();
         assert_eq!(err.code, "VALIDATION_ERROR");
     }
 
@@ -347,13 +399,13 @@ mod tests {
 
     #[tokio::test]
     async fn get_scene_success() {
-        let movie = make_movie();
+        let (movie, owner_id) = make_movie();
         let svc = make_svc(
             MockSceneRepo::new(),
-            MockMovieRepo::with_movie(movie.clone()),
+            MockMovieRepo::with_movie_and_owner(movie.clone(), owner_id.clone()),
         );
         let created = svc
-            .create_scene(create_req(movie.id.clone()))
+            .create_scene(create_req(movie.id.clone()), &owner_id)
             .await
             .unwrap();
         let found = svc.get_scene(&created.id).await.unwrap();
@@ -369,23 +421,23 @@ mod tests {
 
     #[tokio::test]
     async fn list_by_movie_success() {
-        let movie = make_movie();
+        let (movie, owner_id) = make_movie();
         let svc = make_svc(
             MockSceneRepo::new(),
-            MockMovieRepo::with_movie(movie.clone()),
+            MockMovieRepo::with_movie_and_owner(movie.clone(), owner_id.clone()),
         );
 
         let mut req1 = create_req(movie.id.clone());
         req1.title = "Scene 1".into();
         req1.scene_number = 1;
-        svc.create_scene(req1).await.unwrap();
+        svc.create_scene(req1, &owner_id).await.unwrap();
 
         let mut req2 = create_req(movie.id.clone());
         req2.title = "Scene 2".into();
         req2.scene_number = 2;
         req2.start_time = 120;
         req2.end_time = 300;
-        svc.create_scene(req2).await.unwrap();
+        svc.create_scene(req2, &owner_id).await.unwrap();
 
         let scenes = svc.list_by_movie(&movie.id).await.unwrap();
         assert_eq!(scenes.len(), 2);
@@ -397,13 +449,13 @@ mod tests {
 
     #[tokio::test]
     async fn update_scene_success() {
-        let movie = make_movie();
+        let (movie, owner_id) = make_movie();
         let svc = make_svc(
             MockSceneRepo::new(),
-            MockMovieRepo::with_movie(movie.clone()),
+            MockMovieRepo::with_movie_and_owner(movie.clone(), owner_id.clone()),
         );
         let scene = svc
-            .create_scene(create_req(movie.id.clone()))
+            .create_scene(create_req(movie.id.clone()), &owner_id)
             .await
             .unwrap();
         let updated = svc
@@ -416,6 +468,7 @@ mod tests {
                     start_time: Some(60),
                     end_time: Some(180),
                 },
+                &owner_id,
             )
             .await
             .unwrap();
@@ -427,13 +480,13 @@ mod tests {
 
     #[tokio::test]
     async fn update_scene_partial() {
-        let movie = make_movie();
+        let (movie, owner_id) = make_movie();
         let svc = make_svc(
             MockSceneRepo::new(),
-            MockMovieRepo::with_movie(movie.clone()),
+            MockMovieRepo::with_movie_and_owner(movie.clone(), owner_id.clone()),
         );
         let scene = svc
-            .create_scene(create_req(movie.id.clone()))
+            .create_scene(create_req(movie.id.clone()), &owner_id)
             .await
             .unwrap();
         let updated = svc
@@ -446,6 +499,7 @@ mod tests {
                     start_time: None,
                     end_time: None,
                 },
+                &owner_id,
             )
             .await
             .unwrap();
@@ -457,6 +511,7 @@ mod tests {
     #[tokio::test]
     async fn update_scene_not_found() {
         let svc = make_svc(MockSceneRepo::new(), MockMovieRepo::new());
+        let actor = UserId::new();
         let err = svc
             .update_scene(
                 &SceneId::new(),
@@ -467,6 +522,7 @@ mod tests {
                     start_time: None,
                     end_time: None,
                 },
+                &actor,
             )
             .await
             .unwrap_err();
@@ -475,13 +531,13 @@ mod tests {
 
     #[tokio::test]
     async fn update_scene_empty_title() {
-        let movie = make_movie();
+        let (movie, owner_id) = make_movie();
         let svc = make_svc(
             MockSceneRepo::new(),
-            MockMovieRepo::with_movie(movie.clone()),
+            MockMovieRepo::with_movie_and_owner(movie.clone(), owner_id.clone()),
         );
         let scene = svc
-            .create_scene(create_req(movie.id.clone()))
+            .create_scene(create_req(movie.id.clone()), &owner_id)
             .await
             .unwrap();
         let err = svc
@@ -494,6 +550,7 @@ mod tests {
                     start_time: None,
                     end_time: None,
                 },
+                &owner_id,
             )
             .await
             .unwrap_err();
@@ -502,16 +559,15 @@ mod tests {
 
     #[tokio::test]
     async fn update_scene_invalid_times() {
-        let movie = make_movie();
+        let (movie, owner_id) = make_movie();
         let svc = make_svc(
             MockSceneRepo::new(),
-            MockMovieRepo::with_movie(movie.clone()),
+            MockMovieRepo::with_movie_and_owner(movie.clone(), owner_id.clone()),
         );
         let scene = svc
-            .create_scene(create_req(movie.id.clone()))
+            .create_scene(create_req(movie.id.clone()), &owner_id)
             .await
             .unwrap();
-        // Set end_time before existing start_time
         let err = svc
             .update_scene(
                 &scene.id,
@@ -522,6 +578,7 @@ mod tests {
                     start_time: Some(200),
                     end_time: Some(100),
                 },
+                &owner_id,
             )
             .await
             .unwrap_err();
@@ -534,16 +591,16 @@ mod tests {
 
     #[tokio::test]
     async fn delete_scene_success() {
-        let movie = make_movie();
+        let (movie, owner_id) = make_movie();
         let svc = make_svc(
             MockSceneRepo::new(),
-            MockMovieRepo::with_movie(movie.clone()),
+            MockMovieRepo::with_movie_and_owner(movie.clone(), owner_id.clone()),
         );
         let scene = svc
-            .create_scene(create_req(movie.id.clone()))
+            .create_scene(create_req(movie.id.clone()), &owner_id)
             .await
             .unwrap();
-        svc.delete_scene(&scene.id).await.unwrap();
+        svc.delete_scene(&scene.id, &owner_id).await.unwrap();
         let err = svc.get_scene(&scene.id).await.unwrap_err();
         assert_eq!(err.code, "scene.not_found");
     }
@@ -551,7 +608,8 @@ mod tests {
     #[tokio::test]
     async fn delete_scene_not_found() {
         let svc = make_svc(MockSceneRepo::new(), MockMovieRepo::new());
-        let err = svc.delete_scene(&SceneId::new()).await.unwrap_err();
+        let actor = UserId::new();
+        let err = svc.delete_scene(&SceneId::new(), &actor).await.unwrap_err();
         assert_eq!(err.code, "scene.not_found");
     }
 
@@ -561,15 +619,101 @@ mod tests {
 
     #[tokio::test]
     async fn scene_duration() {
-        let movie = make_movie();
+        let (movie, owner_id) = make_movie();
         let svc = make_svc(
             MockSceneRepo::new(),
-            MockMovieRepo::with_movie(movie.clone()),
+            MockMovieRepo::with_movie_and_owner(movie.clone(), owner_id.clone()),
         );
         let scene = svc
-            .create_scene(create_req(movie.id.clone()))
+            .create_scene(create_req(movie.id.clone()), &owner_id)
             .await
             .unwrap();
         assert_eq!(scene.duration_seconds(), 120);
+    }
+
+    // ========================================================================
+    // Authorization
+    // ========================================================================
+
+    #[tokio::test]
+    async fn create_scene_non_member_denied() {
+        let (movie, owner_id) = make_movie();
+        let svc = make_svc(
+            MockSceneRepo::new(),
+            MockMovieRepo::with_movie_and_owner(movie.clone(), owner_id),
+        );
+        let outsider = UserId::new();
+        let err = svc
+            .create_scene(create_req(movie.id.clone()), &outsider)
+            .await
+            .unwrap_err();
+        assert_eq!(err.code, "scene.not_authorized");
+    }
+
+    #[tokio::test]
+    async fn create_scene_viewer_denied() {
+        let (movie, owner_id) = make_movie();
+        let viewer_id = UserId::new();
+        let movie_repo = MockMovieRepo::with_movie_and_owner(movie.clone(), owner_id);
+        movie_repo.members.lock().await.push(MovieMember {
+            movie_id: movie.id.clone(),
+            user_id: viewer_id.clone(),
+            role: MovieRole::Viewer,
+            joined_at: ChronoUtc::now(),
+        });
+        let svc = make_svc(MockSceneRepo::new(), movie_repo);
+
+        let err = svc
+            .create_scene(create_req(movie.id.clone()), &viewer_id)
+            .await
+            .unwrap_err();
+        assert_eq!(err.code, "scene.not_authorized");
+    }
+
+    #[tokio::test]
+    async fn update_scene_non_member_denied() {
+        let (movie, owner_id) = make_movie();
+        let svc = make_svc(
+            MockSceneRepo::new(),
+            MockMovieRepo::with_movie_and_owner(movie.clone(), owner_id.clone()),
+        );
+        let scene = svc
+            .create_scene(create_req(movie.id.clone()), &owner_id)
+            .await
+            .unwrap();
+
+        let outsider = UserId::new();
+        let err = svc
+            .update_scene(
+                &scene.id,
+                UpdateSceneRequest {
+                    title: Some("Nope".into()),
+                    scene_number: None,
+                    description: None,
+                    start_time: None,
+                    end_time: None,
+                },
+                &outsider,
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(err.code, "scene.not_authorized");
+    }
+
+    #[tokio::test]
+    async fn delete_scene_non_member_denied() {
+        let (movie, owner_id) = make_movie();
+        let svc = make_svc(
+            MockSceneRepo::new(),
+            MockMovieRepo::with_movie_and_owner(movie.clone(), owner_id.clone()),
+        );
+        let scene = svc
+            .create_scene(create_req(movie.id.clone()), &owner_id)
+            .await
+            .unwrap();
+
+        let outsider = UserId::new();
+        let err = svc.delete_scene(&scene.id, &outsider).await.unwrap_err();
+        assert_eq!(err.code, "scene.not_authorized");
     }
 }

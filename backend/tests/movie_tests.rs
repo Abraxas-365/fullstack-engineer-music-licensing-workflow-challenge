@@ -393,6 +393,7 @@ async fn test_service_update_movie() {
                 release_year: Some(2025),
                 director: Some("Nolan".into()),
             },
+            &user.id,
         )
         .await
         .unwrap();
@@ -423,6 +424,7 @@ async fn test_service_update_movie_partial() {
                 release_year: None,
                 director: None,
             },
+            &user.id,
         )
         .await
         .unwrap();
@@ -435,6 +437,7 @@ async fn test_service_update_movie_partial() {
 #[tokio::test]
 async fn test_service_update_movie_not_found() {
     let ctx = TestContext::new().await;
+    let actor = backend::kernel::UserId::new();
     let err = ctx
         .movie_svc
         .update_movie(
@@ -445,6 +448,7 @@ async fn test_service_update_movie_not_found() {
                 release_year: None,
                 director: None,
             },
+            &actor,
         )
         .await
         .unwrap_err();
@@ -464,7 +468,10 @@ async fn test_service_delete_movie() {
         .create_movie(ctx.create_req("Movie"), user.id.clone())
         .await
         .unwrap();
-    ctx.movie_svc.delete_movie(&movie.id).await.unwrap();
+    ctx.movie_svc
+        .delete_movie(&movie.id, &user.id)
+        .await
+        .unwrap();
     let err = ctx.movie_svc.get_movie(&movie.id).await.unwrap_err();
     assert_eq!(err.code, "movie.not_found");
 }
@@ -472,9 +479,10 @@ async fn test_service_delete_movie() {
 #[tokio::test]
 async fn test_service_delete_movie_not_found() {
     let ctx = TestContext::new().await;
+    let actor = backend::kernel::UserId::new();
     let err = ctx
         .movie_svc
-        .delete_movie(&MovieId::new())
+        .delete_movie(&MovieId::new(), &actor)
         .await
         .unwrap_err();
     assert_eq!(err.code, "movie.not_found");
@@ -586,6 +594,7 @@ async fn test_service_add_member() {
                 user_id: other.id.clone(),
                 role: Some("SUPERVISOR".into()),
             },
+            &owner.id,
         )
         .await
         .unwrap();
@@ -615,6 +624,7 @@ async fn test_service_add_member_default_role() {
                 user_id: other.id.clone(),
                 role: None,
             },
+            &owner.id,
         )
         .await
         .unwrap();
@@ -640,6 +650,7 @@ async fn test_service_add_member_duplicate() {
                 user_id: owner.id.clone(),
                 role: None,
             },
+            &owner.id,
         )
         .await
         .unwrap_err();
@@ -665,12 +676,13 @@ async fn test_service_remove_member() {
                 user_id: other.id.clone(),
                 role: None,
             },
+            &owner.id,
         )
         .await
         .unwrap();
 
     ctx.movie_svc
-        .remove_member(&movie.id, &other.id)
+        .remove_member(&movie.id, &other.id, &owner.id)
         .await
         .unwrap();
 
@@ -702,6 +714,7 @@ async fn test_service_get_user_movies() {
                 user_id: collaborator.id.clone(),
                 role: Some("EDITOR".into()),
             },
+            &owner.id,
         )
         .await
         .unwrap();
@@ -737,6 +750,7 @@ async fn test_delete_movie_cascades_members() {
                 user_id: other.id.clone(),
                 role: None,
             },
+            &owner.id,
         )
         .await
         .unwrap();

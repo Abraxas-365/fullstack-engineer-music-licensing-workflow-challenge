@@ -14,4 +14,12 @@ impl TrackError {
             ErrorType::Conflict,
         )
     }
+
+    pub fn not_authorized() -> AppError {
+        AppError::new(
+            "track.not_authorized",
+            "Not authorized to perform this action on this track",
+            ErrorType::Authorization,
+        )
+    }
 }
