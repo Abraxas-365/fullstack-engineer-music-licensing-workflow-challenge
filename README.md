@@ -1,6 +1,6 @@
 # Music Licensing Workflow
 
-A fullstack application for managing music licensing negotiations between movie production teams and rights holders (labels and independent artists).
+Full-stack application for managing music licensing negotiations between movie production teams and rights holders (labels and independent artists).
 
 Movie teams place songs into scenes, submit license requests, and negotiate terms (fee, territory, media rights, exclusivity) through a structured offer/counter-offer workflow. Rights holders review incoming requests and respond in real time via Server-Sent Events.
 
@@ -11,184 +11,183 @@ cp .env.example .env
 docker compose up --build
 ```
 
-- **Frontend:** http://localhost:3000
-- **Backend API:** http://localhost:8080/api
-- **Swagger UI:** http://localhost:8080/docs
+| Service | URL |
+|---|---|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:8080/api |
+| Swagger UI | http://localhost:8080/docs |
 
-The backend runs migrations automatically on startup.
+Six demo accounts are seeded automatically (password: `abraxas12345`):
+
+| Email | Role | Persona |
+|---|---|---|
+| `casey@studio.dev` | Producer | Movie supervisor / owner |
+| `jordan@studio.dev` | Producer | Movie team member |
+| `nova@indie.dev` | Artist | Independent song creator |
+| `priya@wavelabel.dev` | Label Manager | Wave Records owner |
+| `mateo@wavelabel.dev` | Label Manager | Wave Records rep |
+| `sam@studio.dev` | Admin | Platform administrator |
 
 ## Architecture
 
 ```
-frontend/          React SPA (Vite + TypeScript + Tailwind v4)
-backend/           Rust REST API (Actix-web + SQLx + PostgreSQL)
-compose.yml        Docker Compose orchestration
+┌─────────────────────────────────────────────────────────────┐
+│                       Docker Compose                         │
+│                                                              │
+│  ┌────────────┐   ┌──────────────────┐   ┌──────────────┐  │
+│  │  Frontend   │   │     Backend      │   │   Postgres   │  │
+│  │  React SPA  │──▶│   Rust / Actix   │──▶│    16-alpine  │  │
+│  │  Nginx :80  │   │   REST + SSE     │   │     :5432    │  │
+│  └────────────┘   └──────────────────┘   └──────────────┘  │
+│     :3000              :8080                  :5432          │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### Backend
+| Layer | Stack |
+|---|---|
+| **Frontend** | React 19, TypeScript, Vite, Tailwind v4, shadcn/ui |
+| **Backend** | Rust, Actix-web, SQLx, PostgreSQL, JWT auth, SSE |
+| **Infra** | Docker Compose (dev), Terraform + AWS ECS Fargate (prod) |
 
-**Rust + Actix-web + SQLx** — chosen for type safety across the full stack (compile-time SQL query validation, exhaustive pattern matching on state machines, zero-cost abstractions for SSE streaming). The domain is inherently stateful (negotiation workflows with complex transition rules), and Rust's type system prevents entire classes of invalid state bugs at compile time.
+### Backend — Hexagonal Architecture
 
-The backend is organized into domain modules, each with its own model, service, repository, API layer, and error types:
+Each domain module follows the same structure: **model** (domain types) → **port** (trait/interface) → **service** (business logic) → **api** (HTTP handlers) → **adapter** (Postgres implementation).
 
 | Module | Responsibility |
-|--------|---------------|
+|---|---|
 | `iam` | Authentication (JWT + refresh tokens), authorization (scope-based RBAC), user management |
-| `movie` | Movies and movie team membership (Owner/Supervisor/Editor/Viewer roles) |
+| `movie` | Movies and movie team membership (Owner / Supervisor / Editor / Viewer) |
 | `scene` | Scenes within movies (timecoded segments) |
 | `song` | Song catalog, artist and label association |
 | `track` | Song placements within scenes (usage type, time range) |
-| `label` | Labels, label membership (Owner/Rep/Artist roles) |
+| `label` | Labels, label membership (Owner / Rep / Artist) |
 | `license` | License requests, offer/counter-offer negotiation, SSE event streaming |
 | `kernel` | Shared types (typed IDs, pagination) |
 | `error` | Structured error responses with codes, types, and detail maps |
 
-**48 REST endpoints** documented with OpenAPI (utoipa) and served via Swagger UI at `/docs`.
-
-### Frontend
-
-**React 19 + TypeScript + Vite + Tailwind v4 + shadcn/ui** (Base UI primitives).
-
-The frontend ships two complete workspaces:
+### Frontend — Dual Workspace
 
 **Studio Workspace** (movie production team):
-- Movie list with search, sort, and creation
-- Movie detail with scenes, team members, and licensing progress
-- Scene detail with track placements, song association via searchable combobox
-- License request creation, submission, counter-offer, and tracking
-- License list with status filters
+- Movie management with search and team member roles
+- Scene detail with track placements and song search
+- License request creation, submission, counter-offer, and status tracking
 
 **Rights Holder Workspace** (labels and independent artists):
-- Catalog management (add/edit songs, view placements)
-- Incoming license request inbox with filters (needs response, status)
-- License negotiation: accept, counter-offer (fee, territory, media rights, exclusivity), reject with reason
-- Label member management (add/remove members, role assignment)
-- Four switchable personas: Label Owner, Label Rep, Label Artist, Independent Artist
+- Song catalog management and placement tracking
+- License inbox with status filters (needs response, approved, rejected)
+- Negotiation: accept, counter-offer, reject with reason
+- Label member management with role assignment
 
-Both workspaces include:
-- Real-time updates via SSE (license status changes appear instantly)
-- Responsive layout (mobile drawer, desktop sidebar)
-- Dark/light theme toggle
-- Notification bell for license events
-- Workspace switcher in user menu
+Both workspaces share: real-time SSE notifications, responsive layout (mobile drawer / desktop sidebar), dark/light theme, notification bell, and workspace switcher.
 
-**Dual API mode:** The frontend can run against the real backend (`/api` proxy) or an in-memory mock backend (default for development). Toggle via the API mode selector — no backend required to explore the full UI.
-
-### Data Model
+## Data Model
 
 ```
-users ──┬── user_roles ──── roles (Admin, Producer, Artist, Label Manager, Viewer)
+users ──┬── user_roles ──── roles (Admin, Producer, Artist, Label Manager)
         ├── movie_members ── movies ── scenes ── tracks ── license_requests ── license_offers
         └── label_members ── labels ── songs ─────────────────┘
 ```
 
-Key relationships:
-- A **movie** has **scenes** (timecoded segments), each with **track placements**
+- A **movie** has **scenes** (timecoded segments), each with **track** placements
 - A **track** links a **song** to a scene with usage type and time range
-- Each track can have one **license request**, which progresses through: `DRAFT → REQUESTED → APPROVED/REJECTED/CANCELLED`
-- Negotiation happens through **license offers** — each offer has a number, side (movie team or rights holder), fee, territory, media rights, exclusivity, and date range
-- **Songs** belong to an **artist** (user) and optionally a **label**
-- **Labels** have members with roles: Owner (full control), Rep (can negotiate), Artist (read-only on negotiations)
-- **Independent artists** (songs with no label) negotiate directly
+- Each track can have one **license request**: `DRAFT → REQUESTED → APPROVED / REJECTED / CANCELLED`
+- Negotiation happens through **license offers** — each side proposes terms until one accepts or rejects
+- **Songs** belong to an **artist** and optionally a **label**
+- Rights holder resolution: label Owner/Rep if the song has a label, otherwise the artist directly
 
-### Real-Time: Server-Sent Events
+## Real-Time: Server-Sent Events
 
-SSE is implemented end-to-end, not just suggested:
+SSE is implemented end-to-end:
 
-- **Backend:** `GET /api/licenses/events` streams `LicenseEvent` payloads (submitted, counter_offer, accepted, rejected, cancelled) via `tokio::sync::broadcast`
-- **Frontend:** `EventSource` client subscribes on mount, updates UI state on each event
-- **Compression fix:** `Content-Encoding: identity` header prevents gzip buffering from delaying SSE delivery to browsers
+- **Backend:** `GET /api/licenses/events` streams `LicenseEvent` payloads (`submitted`, `counter_offer`, `accepted`, `rejected`, `cancelled`) via `tokio::sync::broadcast`
+- **Frontend:** `EventSource` subscribes on mount, triggers toast notifications and UI updates on each event
+- **Compression fix:** `Content-Encoding: identity` header prevents gzip buffering from delaying SSE delivery
 
-The SSE stream carries structured events with license ID, track ID, event kind, actor, and timestamp — enough for any client to update its view without re-fetching.
+## API
 
-## API Overview
-
-Authentication uses JWT bearer tokens. Register, login, and use the access token:
+55 REST endpoints documented with OpenAPI (utoipa). Full interactive docs at `/docs` when the server is running.
 
 ```bash
-# Register
-curl -X POST http://localhost:8080/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email": "producer@acme.com", "password": "Password1!", "name": "Casey"}'
-
-# Login
+# Login (seeded demo account)
 curl -X POST http://localhost:8080/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "producer@acme.com", "password": "Password1!"}'
+  -d '{"email": "casey@studio.dev", "password": "abraxas12345"}'
 # → { "access_token": "eyJ...", "refresh_token": "..." }
 
 # Create a movie
 curl -X POST http://localhost:8080/api/movies \
   -H "Authorization: Bearer eyJ..." \
   -H "Content-Type: application/json" \
-  -d '{"title": "Cyber City", "director": "Jane Doe", "release_year": 2026}'
+  -d '{"title": "Midnight Symphony", "director": "Casey Reyes", "release_year": 2027}'
 
 # Listen for license events (SSE)
-curl -N http://localhost:8080/api/licenses/events
+curl -N http://localhost:8080/api/licenses/events -H "Authorization: Bearer eyJ..."
 ```
 
-Full API documentation is available at http://localhost:8080/docs after starting the backend.
+A complete multi-user curl walkthrough (login as each persona, create resources, negotiate a license end-to-end) is available in [`backend/docs/api-flows.md`](backend/docs/api-flows.md).
 
-## Testing
-
-The backend has **~490 tests** across unit, integration, and API levels:
-
-```bash
-cd backend
-
-# Run all tests (requires Docker for Testcontainers)
-cargo test
-
-# Run a specific test module
-cargo test --test license_tests
-cargo test --test license_api_tests
-```
-
-Tests use [Testcontainers](https://testcontainers.com/) to spin up real PostgreSQL instances — no mocks, no SQLite substitution. Each test file gets an isolated database with migrations applied.
-
-| Test file | Count | What it covers |
-|-----------|-------|----------------|
-| `license_tests` | 46 | Full negotiation workflow: create, submit, counter-offer, accept, reject, cancel, authorization checks |
-| `license_api_tests` | 28 | HTTP-level license endpoint tests (status codes, response shapes, SSE streaming) |
-| `song_tests` | 35 | CRUD, artist/label association, search, pagination |
-| `movie_tests` | 31 | CRUD, team membership, role-based access |
-| `label_tests` | 26 | CRUD, member management, role transitions |
-| `auth_tests` | 25 | Registration, login, token refresh, session management |
-| `track_tests` | 22 | Track placement, time range validation, song-scene linking |
-| `scene_tests` | 19 | CRUD, timecode validation, movie association |
-| `role_tests` | 19 | RBAC, scope resolution, role assignment |
-| `user_tests` | 15 | Profile management, status transitions |
-| `auth_api_tests` | 10 | HTTP-level auth endpoint tests |
-| Service unit tests | ~215 | Inline `#[tokio::test]` tests in each service module |
-
-## Tech Decisions and Tradeoffs
-
-### Why REST instead of GraphQL?
-
-The domain has a clear resource hierarchy (movies → scenes → tracks → licenses → offers) that maps naturally to REST endpoints. The negotiation workflow is action-oriented (submit, counter-offer, accept, reject) — these are better expressed as dedicated POST endpoints than generic mutations.
-
-GraphQL would add value if clients needed flexible field selection across deeply nested data, but the current UI makes predictable queries that REST serves well. The SSE stream handles the real-time requirement that GraphQL subscriptions would otherwise address.
-
-### Why SSE instead of WebSockets?
-
-License negotiation events are server-to-client: "someone submitted an offer," "the other side accepted." The client doesn't need to push data through the same channel — it uses regular POST requests for actions. SSE is simpler (no handshake upgrade, no ping/pong, automatic reconnection built into `EventSource`), works through HTTP/2 multiplexing, and needs no additional infrastructure.
-
-WebSockets would be warranted if we needed bidirectional streaming (e.g., real-time collaborative editing of license terms), but the current workflow is request/response for actions + server push for notifications.
-
-### Error handling
-
-The API returns structured error responses with machine-readable codes, human-readable messages, error categories, and optional detail maps:
+### Error Responses
 
 ```json
 {
-  "code": "CONFLICT",
+  "code": "license.conflict",
   "message": "A license request already exists for this track",
-  "error_type": "Conflict",
+  "error_type": "CONFLICT",
   "details": { "track_id": "abc-123" }
 }
 ```
 
-Internal errors are redacted from clients (generic message, details stripped) while the full error is logged server-side.
+Internal errors are redacted from clients (generic message, details stripped) while logged in full server-side.
+
+## Testing
+
+547 tests across three levels — all using real PostgreSQL via [Testcontainers](https://testcontainers.com/) (no mocks, no SQLite):
+
+```bash
+cd backend && make test
+```
+
+| Level | Files | Tests | What it covers |
+|---|---|---|---|
+| Service unit | 9 `src/*/service.rs` | 215 | Business logic, state transitions, authorization rules |
+| Integration | 10 `tests/*_tests.rs` | 248 | Full service + Postgres adapter against real DB |
+| API (e2e) | 6 `tests/*_api_tests.rs` | 84 | HTTP-level: status codes, response shapes, auth enforcement |
+
+## Environment Variables
+
+All variables have sensible defaults for local development. See [`.env.example`](.env.example).
+
+| Variable | Default | Description |
+|---|---|---|
+| `DATABASE_URL` | `postgres://postgres:postgres@127.0.0.1:5432/music_licensing` | Postgres connection string |
+| `JWT_SECRET` | dev default (insecure) | HMAC signing key for JWTs — **set in production** |
+| `RUST_LOG` | `info` | Backend log level |
+| `CORS_ORIGIN` | `*` (any origin) | Allowed CORS origin |
+| `BIND_ADDR` | `0.0.0.0:8080` | Backend listen address |
+| `DB_MAX_CONNECTIONS` | `10` | Postgres connection pool size |
+| `ACCESS_TOKEN_TTL_SECS` | `900` | Access token lifetime (seconds) |
+| `REFRESH_TOKEN_TTL_SECS` | `604800` | Refresh token lifetime (seconds) |
+| `VITE_USE_MOCK_API` | `false` | Set `true` to build frontend against the in-memory mock API |
+
+Full backend variable reference: [`backend/README.md`](backend/README.md).
+
+## Development (without Docker)
+
+```bash
+# 1. Start Postgres
+docker run -d --name music-pg \
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=music_licensing \
+  -p 5432:5432 postgres:16-alpine
+
+# 2. Backend (Terminal 1)
+cd backend && cargo run
+
+# 3. Frontend (Terminal 2)
+cd frontend && npm install && npm run dev
+# → http://localhost:5173
+```
+
+Or use the Makefile shortcuts: `make backend-run`, `make frontend-dev`.
 
 ## Project Structure
 
@@ -196,76 +195,51 @@ Internal errors are redacted from clients (generic message, details stripped) wh
 .
 ├── backend/
 │   ├── src/
-│   │   ├── iam/              # Auth, users, roles, sessions
-│   │   ├── movie/            # Movies, movie members
-│   │   ├── scene/            # Scenes
-│   │   ├── song/             # Songs
-│   │   ├── track/            # Track placements
-│   │   ├── label/            # Labels, label members
-│   │   ├── license/          # License requests, offers, SSE
-│   │   ├── kernel/           # Shared types
-│   │   ├── error/            # Error types and responses
-│   │   ├── openapi.rs        # OpenAPI spec generation
-│   │   └── main.rs           # Server bootstrap
-│   ├── migrations/           # SQL migrations
-│   ├── tests/                # Integration + API tests
-│   ├── Cargo.toml
+│   │   ├── iam/           # Auth, users, roles, sessions
+│   │   ├── movie/         # Movies, members
+│   │   ├── scene/         # Scenes
+│   │   ├── song/          # Songs
+│   │   ├── track/         # Track placements
+│   │   ├── label/         # Labels, members
+│   │   ├── license/       # License requests, offers, SSE
+│   │   ├── kernel/        # Shared types
+│   │   ├── error/         # Error handling
+│   │   ├── openapi.rs     # OpenAPI spec
+│   │   └── main.rs        # Server bootstrap
+│   ├── migrations/        # SQL migrations (auto-run on startup)
+│   ├── tests/             # Integration + API tests
 │   └── Dockerfile
 ├── frontend/
 │   ├── src/
-│   │   ├── api/              # API client (real + mock backends)
-│   │   ├── components/       # Shared UI components + shadcn/ui primitives
-│   │   ├── lib/              # Hooks, utilities, persona system
+│   │   ├── api/           # API client layer
+│   │   ├── components/    # UI components + shadcn/ui primitives
+│   │   ├── lib/           # Hooks, auth, utilities
 │   │   ├── pages/
-│   │   │   ├── studio/       # Movie team workspace
-│   │   │   └── rights/       # Rights holder workspace
-│   │   └── App.tsx           # Router
+│   │   │   ├── studio/    # Movie team workspace
+│   │   │   └── rights/    # Rights holder workspace
+│   │   └── App.tsx        # Router
 │   ├── Dockerfile
 │   └── nginx.conf
+├── infra/
+│   └── terraform/         # AWS ECS + S3/CloudFront + RDS
 ├── compose.yml
-├── .env.example
-└── README.md
+├── Makefile
+└── .env.example
 ```
 
-## Development (without Docker)
+## Deployment
 
-If you prefer running services directly:
+Terraform for AWS production deployment (ECS Fargate + ALB, S3 + CloudFront, RDS PostgreSQL) lives in [`infra/terraform/`](infra/terraform). See [`infra/README.md`](infra/README.md) for architecture and deploy steps.
 
-```bash
-# Terminal 1: PostgreSQL
-docker run -d --name music-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=music_licensing -p 5432:5432 postgres:16-alpine
+## Tech Decisions
 
-# Terminal 2: Backend
-cd backend
-export DATABASE_URL=postgres://postgres:postgres@localhost:5432/music_licensing
-cargo run
+| Decision | Rationale |
+|---|---|
+| **REST over GraphQL** | Clear resource hierarchy (movies → scenes → tracks → licenses → offers) maps naturally to REST. Negotiation actions (submit, counter, accept, reject) are better as dedicated endpoints than generic mutations. |
+| **SSE over WebSockets** | License events are server-to-client only. SSE is simpler (no handshake, automatic reconnection via `EventSource`), works through HTTP/2, and needs no extra infrastructure. |
+| **Rust + Actix-web** | Compile-time SQL validation (SQLx), exhaustive pattern matching on the license state machine, and zero-cost SSE streaming. The domain is inherently stateful — Rust's type system prevents invalid state transitions at compile time. |
+| **Testcontainers** | Every test runs against real PostgreSQL — no mocks, no SQLite. Catches real SQL bugs and constraint violations that in-memory fakes would miss. |
 
-# Terminal 3: Frontend (real API mode)
-cd frontend
-npm install
-npm run dev
-# Open http://localhost:5173, switch to "Real" API mode in the UI
+## License
 
-# Frontend (mock mode, no backend needed)
-cd frontend
-npm install
-npm run dev
-# Open http://localhost:5173, keep "Mock" API mode (default)
-```
-
-## Deployment (AWS)
-
-Terraform for a production deployment (ECS Fargate backend behind an ALB, S3 + CloudFront for the frontend, RDS Postgres) lives in [`infra/terraform`](infra/terraform). See [`infra/README.md`](infra/README.md) for architecture notes and deploy steps.
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | `postgres://postgres:postgres@localhost:5432/music_licensing` | PostgreSQL connection string |
-| `JWT_SECRET` | dev default (insecure) | Secret key for JWT signing (min 32 chars) |
-| `RUST_LOG` | `info` | Log level (trace, debug, info, warn, error) |
-| `CORS_ORIGIN` | `*` | Allowed CORS origin (set to frontend URL in production) |
-| `BIND_ADDR` | `0.0.0.0:8080` | Backend listen address |
-| `DB_MAX_CONNECTIONS` | `10` | PostgreSQL connection pool size |
-| `ACCESS_TOKEN_TTL_SECS` | `900` | JWT access token lifetime |
-| `REFRESH_TOKEN_TTL_SECS` | `604800` | JWT refresh token lifetime |
+[MIT](LICENSE)
