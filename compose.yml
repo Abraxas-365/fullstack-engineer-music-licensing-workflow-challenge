@@ -30,7 +30,10 @@ services:
         condition: service_healthy
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_USE_MOCK_API: ${VITE_USE_MOCK_API:-false}
     ports:
       - "${FRONTEND_PORT:-3000}:80"
     depends_on:

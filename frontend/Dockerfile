@@ -10,6 +10,9 @@ COPY . .
 ARG VITE_API_URL
 ENV VITE_API_URL=${VITE_API_URL}
 
+ARG VITE_USE_MOCK_API
+ENV VITE_USE_MOCK_API=${VITE_USE_MOCK_API}
+
 RUN npm run build
 
 # ── Runtime stage ────────────────────────────────────────────────────────────
