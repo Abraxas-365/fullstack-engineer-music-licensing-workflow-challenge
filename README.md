@@ -229,7 +229,57 @@ Or use the Makefile shortcuts: `make backend-run`, `make frontend-dev`.
 
 ## Deployment
 
-Terraform for AWS production deployment (ECS Fargate + ALB, S3 + CloudFront, RDS PostgreSQL) lives in [`infra/terraform/`](infra/terraform). See [`infra/README.md`](infra/README.md) for architecture and deploy steps.
+### Cloud Architecture (AWS)
+
+```
+                          ┌──────────────────────────────────┐
+                          │            Route 53               │
+                          │   app.example.com  api.example.com│
+                          └──────┬──────────────────┬────────┘
+                                 │                  │
+                   ┌─────────────▼──────┐  ┌───────▼──────────────┐
+                   │  CloudFront (CDN)   │  │   ALB (public subnet) │
+                   │  S3 origin (OAC)    │  │   300s idle timeout   │
+                   │  SPA fallback       │  │   (SSE-friendly)      │
+                   └─────────────────────┘  └───────┬──────────────┘
+                                                    │
+                          ┌─────────── VPC ─────────┼──────────────┐
+                          │                         │              │
+                          │              ┌──────────▼───────────┐  │
+                          │              │  ECS Fargate          │  │
+                          │              │  (private subnet)     │  │
+                          │              │  Rust backend          │  │
+                          │              │  autoscaling on CPU    │  │
+                          │              └──────────┬───────────┘  │
+                          │                         │              │
+                          │              ┌──────────▼───────────┐  │
+                          │              │  RDS PostgreSQL       │  │
+                          │              │  (private subnet)     │  │
+                          │              │  encrypted, no public │  │
+                          │              └──────────────────────┘  │
+                          │                                        │
+                          │  NAT GW (public) ← ECS outbound        │
+                          └────────────────────────────────────────┘
+```
+
+**Key design choices:**
+
+- **Frontend** is pure static files (S3 + CloudFront) — no container needed, global CDN caching, SPA fallback via custom error responses (403/404 → `index.html`)
+- **API calls go directly to the ALB**, not through CloudFront — avoids CDN caching issues with authenticated/dynamic responses and keeps SSE connections clean (ALB idle timeout is set to 300s for long-lived SSE streams)
+- **Cross-origin**: frontend on `app.example.com`, backend on `api.example.com` — `CORS_ORIGIN` is set to the CloudFront domain, and `VITE_API_URL` is set at frontend build time to point at the ALB
+- **RDS + ECS in private subnets** — only the ALB is internet-facing; backend reaches the internet via a NAT gateway (for ECR image pulls, etc.)
+- **Secrets**: DB credentials stored in AWS Secrets Manager, injected into ECS task definition as environment variables
+
+### CI/CD
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| [`ci.yml`](.github/workflows/ci.yml) | PR to `main`, push to `main` | Lint, typecheck, test (backend + frontend + Terraform validate). No deploy. |
+| [`deploy.yml`](.github/workflows/deploy.yml) | Manual (`workflow_dispatch`) | Runs tests → `terraform apply` → builds + pushes backend image to ECR → forces ECS rollout → builds frontend with `VITE_API_URL` → syncs to S3 → invalidates CloudFront cache |
+
+Deploy is **never automatic** — merging to `main` runs CI only. Deployment requires manually triggering the workflow and typing `deploy` as confirmation.
+
+See [`infra/README.md`](infra/README.md) for Terraform module breakdown, prerequisites, bootstrap steps, and one-time GitHub/AWS setup.
 
 ## Tech Decisions
 
