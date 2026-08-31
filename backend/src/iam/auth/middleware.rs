@@ -67,7 +67,7 @@ impl FromRequest for AuthContext {
 }
 
 fn extract_auth(req: &HttpRequest) -> Result<AuthContext, AppError> {
-    let token = extract_bearer_token(req).ok_or_else(|| AuthError::unauthorized())?;
+    let token = extract_bearer_token(req).ok_or_else(AuthError::unauthorized)?;
 
     let token_svc = req
         .app_data::<Data<dyn TokenService>>()
@@ -85,14 +85,12 @@ fn extract_auth(req: &HttpRequest) -> Result<AuthContext, AppError> {
 
 fn extract_bearer_token(req: &HttpRequest) -> Option<String> {
     // Check Authorization: Bearer <token>
-    if let Some(auth_header) = req.headers().get("Authorization") {
-        if let Ok(header_str) = auth_header.to_str() {
-            if let Some(token) = header_str.strip_prefix("Bearer ") {
-                if !token.is_empty() {
-                    return Some(token.to_string());
-                }
-            }
-        }
+    if let Some(auth_header) = req.headers().get("Authorization")
+        && let Ok(header_str) = auth_header.to_str()
+        && let Some(token) = header_str.strip_prefix("Bearer ")
+        && !token.is_empty()
+    {
+        return Some(token.to_string());
     }
 
     // Fallback to cookie

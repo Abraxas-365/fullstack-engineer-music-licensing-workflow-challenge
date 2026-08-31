@@ -129,11 +129,11 @@ pub struct UpdateTrackRequest {
 
 impl UpdateTrackRequest {
     pub fn validate(&self) -> Result<Option<UsageType>, AppError> {
-        if let Some(start) = self.start_time_seconds {
-            if start < 0 {
-                return Err(AppError::validation("Start time cannot be negative")
-                    .with_detail("field", "start_time_seconds"));
-            }
+        if let Some(start) = self.start_time_seconds
+            && start < 0
+        {
+            return Err(AppError::validation("Start time cannot be negative")
+                .with_detail("field", "start_time_seconds"));
         }
         match &self.usage_type {
             Some(ut) => Ok(Some(UsageType::try_from(ut.as_str())?)),

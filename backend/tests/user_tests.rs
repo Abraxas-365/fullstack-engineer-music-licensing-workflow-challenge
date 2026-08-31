@@ -5,8 +5,8 @@ use std::sync::Arc;
 use backend::iam::user::adapters::{BcryptPasswordService, PostgresUserRepository};
 use backend::iam::user::model::UserFilter;
 use backend::iam::user::{
-    CreateUserRequest, OAuthProvider, PasswordService, UpdateUserRequest, User, UserRepository,
-    UserService, UserStatus,
+    CreateUserRequest, OAuthProvider, UpdateUserRequest, User, UserRepository, UserService,
+    UserStatus,
 };
 use backend::kernel::{PaginationOptions, UserId};
 

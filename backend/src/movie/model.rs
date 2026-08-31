@@ -99,13 +99,13 @@ impl CreateMovieRequest {
         if self.title.trim().is_empty() {
             return Err(AppError::validation("Title is required").with_detail("field", "title"));
         }
-        if let Some(year) = self.release_year {
-            if year < 1888 || year > 2100 {
-                return Err(
-                    AppError::validation("Release year must be between 1888 and 2100")
-                        .with_detail("field", "release_year"),
-                );
-            }
+        if let Some(year) = self.release_year
+            && (!(1888..=2100).contains(&year))
+        {
+            return Err(
+                AppError::validation("Release year must be between 1888 and 2100")
+                    .with_detail("field", "release_year"),
+            );
         }
         Ok(())
     }
@@ -121,20 +121,18 @@ pub struct UpdateMovieRequest {
 
 impl UpdateMovieRequest {
     pub fn validate(&self) -> Result<(), AppError> {
-        if let Some(ref title) = self.title {
-            if title.trim().is_empty() {
-                return Err(
-                    AppError::validation("Title cannot be empty").with_detail("field", "title")
-                );
-            }
+        if let Some(ref title) = self.title
+            && title.trim().is_empty()
+        {
+            return Err(AppError::validation("Title cannot be empty").with_detail("field", "title"));
         }
-        if let Some(year) = self.release_year {
-            if year < 1888 || year > 2100 {
-                return Err(
-                    AppError::validation("Release year must be between 1888 and 2100")
-                        .with_detail("field", "release_year"),
-                );
-            }
+        if let Some(year) = self.release_year
+            && (!(1888..=2100).contains(&year))
+        {
+            return Err(
+                AppError::validation("Release year must be between 1888 and 2100")
+                    .with_detail("field", "release_year"),
+            );
         }
         Ok(())
     }

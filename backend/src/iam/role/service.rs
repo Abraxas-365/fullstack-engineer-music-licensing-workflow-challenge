@@ -40,7 +40,7 @@ impl RoleService {
             .repo
             .get_by_id(id)
             .await?
-            .ok_or_else(|| RoleError::not_found())?;
+            .ok_or_else(RoleError::not_found)?;
         Ok(RoleResponse::from(&role))
     }
 
@@ -59,14 +59,14 @@ impl RoleService {
             .repo
             .get_by_id(id)
             .await?
-            .ok_or_else(|| RoleError::not_found())?;
+            .ok_or_else(RoleError::not_found)?;
 
         if let Some(name) = req.name {
             // Check for duplicate name (exclude current role)
-            if let Some(existing) = self.repo.get_by_name(&name).await? {
-                if existing.id != role.id {
-                    return Err(RoleError::already_exists().with_detail("name", name));
-                }
+            if let Some(existing) = self.repo.get_by_name(&name).await?
+                && existing.id != role.id
+            {
+                return Err(RoleError::already_exists().with_detail("name", name));
             }
             role.name = name;
         }
@@ -89,7 +89,7 @@ impl RoleService {
         self.repo
             .get_by_id(id)
             .await?
-            .ok_or_else(|| RoleError::not_found())?;
+            .ok_or_else(RoleError::not_found)?;
         self.repo.delete(id).await
     }
 
@@ -101,12 +101,12 @@ impl RoleService {
         self.repo
             .get_by_id(role_id)
             .await?
-            .ok_or_else(|| RoleError::not_found())?;
+            .ok_or_else(RoleError::not_found)?;
 
         self.user_repo
             .get_by_id(user_id)
             .await?
-            .ok_or_else(|| UserError::not_found())?;
+            .ok_or_else(UserError::not_found)?;
 
         self.repo.assign_to_user(user_id, role_id).await
     }
@@ -123,7 +123,7 @@ impl RoleService {
         self.user_repo
             .get_by_id(user_id)
             .await?
-            .ok_or_else(|| UserError::not_found())?;
+            .ok_or_else(UserError::not_found)?;
 
         let roles = self.repo.list_by_user(user_id).await?;
         let effective_scopes = resolve_effective_scopes(&roles);
@@ -140,7 +140,7 @@ impl RoleService {
         self.user_repo
             .get_by_id(user_id)
             .await?
-            .ok_or_else(|| UserError::not_found())?;
+            .ok_or_else(UserError::not_found)?;
 
         let roles = self.repo.list_by_user(user_id).await?;
         Ok(resolve_effective_scopes(&roles))

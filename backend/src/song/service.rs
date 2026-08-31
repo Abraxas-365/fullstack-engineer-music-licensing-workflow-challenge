@@ -74,7 +74,7 @@ impl SongService {
         self.song_repo
             .get_by_id(id)
             .await?
-            .ok_or_else(|| SongError::not_found())
+            .ok_or_else(SongError::not_found)
     }
 
     pub async fn find_songs(
