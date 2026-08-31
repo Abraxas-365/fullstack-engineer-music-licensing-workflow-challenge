@@ -59,6 +59,11 @@ export interface Track {
   scene_id: UUID
   song_id: UUID
   usage_type: UsageType
+  /** Start of the excerpt within the song's own timeline, in seconds. */
+  start_time_seconds: number
+  /** End of the excerpt within the song's own timeline, in seconds. */
+  end_time_seconds: number
+  duration_seconds: number
   created_by: UUID
   notes: string | null
   created_at: string

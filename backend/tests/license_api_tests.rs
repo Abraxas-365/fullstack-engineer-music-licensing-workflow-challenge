@@ -143,6 +143,8 @@ impl ApiTestContext {
             scene.id.clone(),
             song.id.clone(),
             UsageType::Background,
+            0,
+            60,
             owner.id.clone(),
         );
         self.track_repo.save(&track).await.unwrap();
@@ -184,6 +186,8 @@ impl ApiTestContext {
             scene.id.clone(),
             song.id.clone(),
             UsageType::Background,
+            0,
+            60,
             owner.id.clone(),
         );
         self.track_repo.save(&track).await.unwrap();

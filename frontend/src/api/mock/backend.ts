@@ -305,6 +305,9 @@ const tracksApi: TracksApi = {
       scene_id: body.scene_id,
       song_id: body.song_id,
       usage_type: body.usage_type,
+      start_time_seconds: body.start_time_seconds,
+      end_time_seconds: body.end_time_seconds,
+      duration_seconds: body.end_time_seconds - body.start_time_seconds,
       created_by: USERS.supervisor.id,
       notes: body.notes ?? null,
       created_at: nowIso(),
@@ -320,6 +323,9 @@ const tracksApi: TracksApi = {
   async update(id, body) {
     const track = tracks.find(t => t.id === id) ?? notFound('Track')
     if (body.usage_type != null) track.usage_type = body.usage_type
+    if (body.start_time_seconds != null) track.start_time_seconds = body.start_time_seconds
+    if (body.end_time_seconds != null) track.end_time_seconds = body.end_time_seconds
+    track.duration_seconds = track.end_time_seconds - track.start_time_seconds
     if (body.notes !== undefined) track.notes = body.notes
     track.updated_at = nowIso()
     return delay(track)

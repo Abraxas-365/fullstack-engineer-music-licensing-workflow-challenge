@@ -6,8 +6,8 @@ use crate::kernel::{SceneId, SongId, TrackId, UserId};
 use super::super::model::{Track, UsageType};
 use super::super::port::TrackRepository;
 
-const TRACK_COLUMNS: &str =
-    "id, scene_id, song_id, usage_type, created_by, notes, created_at, updated_at";
+const TRACK_COLUMNS: &str = "id, scene_id, song_id, usage_type, start_time_seconds, \
+    end_time_seconds, created_by, notes, created_at, updated_at";
 
 pub struct PostgresTrackRepository {
     pool: PgPool,
@@ -38,6 +38,12 @@ fn track_from_row(row: &sqlx::postgres::PgRow) -> Result<Track, AppError> {
                 .map_err(|e| AppError::internal(e.to_string()))?,
         ),
         usage_type: UsageType::try_from(usage_str.as_str())?,
+        start_time_seconds: row
+            .try_get("start_time_seconds")
+            .map_err(|e| AppError::internal(e.to_string()))?,
+        end_time_seconds: row
+            .try_get("end_time_seconds")
+            .map_err(|e| AppError::internal(e.to_string()))?,
         created_by: UserId::from_string(
             row.try_get("created_by")
                 .map_err(|e| AppError::internal(e.to_string()))?,
@@ -58,12 +64,14 @@ fn track_from_row(row: &sqlx::postgres::PgRow) -> Result<Track, AppError> {
 impl TrackRepository for PostgresTrackRepository {
     async fn save(&self, track: &Track) -> Result<(), AppError> {
         sqlx::query(&format!(
-            "INSERT INTO tracks ({TRACK_COLUMNS}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
+            "INSERT INTO tracks ({TRACK_COLUMNS}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
         ))
         .bind(track.id.as_str())
         .bind(track.scene_id.as_str())
         .bind(track.song_id.as_str())
         .bind(track.usage_type.as_str())
+        .bind(track.start_time_seconds)
+        .bind(track.end_time_seconds)
         .bind(track.created_by.as_str())
         .bind(&track.notes)
         .bind(track.created_at)
@@ -126,14 +134,19 @@ impl TrackRepository for PostgresTrackRepository {
     }
 
     async fn update(&self, track: &Track) -> Result<(), AppError> {
-        sqlx::query("UPDATE tracks SET usage_type = $1, notes = $2, updated_at = $3 WHERE id = $4")
-            .bind(track.usage_type.as_str())
-            .bind(&track.notes)
-            .bind(track.updated_at)
-            .bind(track.id.as_str())
-            .execute(&self.pool)
-            .await
-            .map_err(|e| AppError::internal(e.to_string()))?;
+        sqlx::query(
+            "UPDATE tracks SET usage_type = $1, start_time_seconds = $2, end_time_seconds = $3, \
+             notes = $4, updated_at = $5 WHERE id = $6",
+        )
+        .bind(track.usage_type.as_str())
+        .bind(track.start_time_seconds)
+        .bind(track.end_time_seconds)
+        .bind(&track.notes)
+        .bind(track.updated_at)
+        .bind(track.id.as_str())
+        .execute(&self.pool)
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
         Ok(())
     }
 

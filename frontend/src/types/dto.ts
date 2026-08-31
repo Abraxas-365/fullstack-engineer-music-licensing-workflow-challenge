@@ -98,11 +98,15 @@ export interface CreateTrackRequest {
   scene_id: string
   song_id: string
   usage_type: UsageType
+  start_time_seconds: number
+  end_time_seconds: number
   notes?: string | null
 }
 
 export interface UpdateTrackRequest {
   usage_type?: UsageType | null
+  start_time_seconds?: number | null
+  end_time_seconds?: number | null
   notes?: string | null
 }
 

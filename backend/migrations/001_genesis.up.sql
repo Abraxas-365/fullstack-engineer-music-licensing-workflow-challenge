@@ -281,17 +281,21 @@ COMMENT ON TABLE scenes IS 'Segments of a movie where music tracks are placed';
 -- ============================================================================
 
 CREATE TABLE tracks (
-    id           VARCHAR(255) PRIMARY KEY,
-    scene_id     VARCHAR(255) NOT NULL REFERENCES scenes(id) ON DELETE CASCADE,
-    song_id      VARCHAR(255) NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
-    usage_type   VARCHAR(50) NOT NULL,
-    created_by   VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    notes        TEXT,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    id                 VARCHAR(255) PRIMARY KEY,
+    scene_id           VARCHAR(255) NOT NULL REFERENCES scenes(id) ON DELETE CASCADE,
+    song_id            VARCHAR(255) NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
+    usage_type         VARCHAR(50) NOT NULL,
+    start_time_seconds INTEGER NOT NULL,
+    end_time_seconds   INTEGER NOT NULL,
+    created_by         VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    notes              TEXT,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT uq_track_scene_song UNIQUE (scene_id, song_id),
-    CONSTRAINT chk_track_usage_type CHECK (usage_type IN ('BACKGROUND', 'FEATURED', 'CREDITS', 'TRAILER'))
+    CONSTRAINT chk_track_usage_type CHECK (usage_type IN ('BACKGROUND', 'FEATURED', 'CREDITS', 'TRAILER')),
+    CONSTRAINT chk_track_start_positive CHECK (start_time_seconds >= 0),
+    CONSTRAINT chk_track_times CHECK (end_time_seconds > start_time_seconds)
 );
 
 CREATE INDEX idx_tracks_scene_id ON tracks(scene_id);

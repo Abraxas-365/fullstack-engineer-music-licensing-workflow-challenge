@@ -19,6 +19,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
@@ -172,6 +173,7 @@ export function StudioSceneDetailPage() {
                 <TableRow>
                   <TableHead>Song</TableHead>
                   <TableHead>Usage</TableHead>
+                  <TableHead>Clip</TableHead>
                   <TableHead>License</TableHead>
                   <TableHead className="text-right">Latest fee</TableHead>
                   <TableHead>Next action</TableHead>
@@ -188,6 +190,9 @@ export function StudioSceneDetailPage() {
                     <TableRow key={track.id}>
                       <TableCell className="font-medium text-[13px]">{song?.title ?? track.song_id}</TableCell>
                       <TableCell><UsageBadge usage={track.usage_type} /></TableCell>
+                      <TableCell className="font-mono text-[12px] text-muted-foreground">
+                        {formatTime(track.start_time_seconds)}–{formatTime(track.end_time_seconds)}
+                      </TableCell>
                       <TableCell>
                         {license ? <StatusBadge status={license.status} /> : (
                           <span className="text-[12px] text-muted-foreground">Not requested</span>
@@ -228,6 +233,9 @@ export function StudioSceneDetailPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold">{song?.title ?? track.song_id}</p>
+                        <p className="mt-0.5 text-[12px] font-mono text-muted-foreground">
+                          {formatTime(track.start_time_seconds)}–{formatTime(track.end_time_seconds)}
+                        </p>
                         {track.notes && (
                           <p className="mt-0.5 truncate text-[12px] text-muted-foreground">{track.notes}</p>
                         )}
@@ -308,15 +316,36 @@ function AddTrackDialog({ sceneId, onCreated }: { sceneId: string; onCreated: ()
   )
   const [songId, setSongId] = useState('')
   const [usageType, setUsageType] = useState<UsageType>('BACKGROUND')
+  const [startTime, setStartTime] = useState('0')
+  const [endTime, setEndTime] = useState('60')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  const selectedSong = songs?.find(s => s.id === songId)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!songId) return
+    const start = Number(startTime)
+    const end = Number(endTime)
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end <= start) {
+      toast.error('End time must be greater than start time')
+      return
+    }
+    if (selectedSong && end > selectedSong.duration_seconds) {
+      toast.error(`Clip must fit within the song's duration (${formatTime(selectedSong.duration_seconds)})`)
+      return
+    }
     setSubmitting(true)
     try {
-      await api.tracks.create({ scene_id: sceneId, song_id: songId, usage_type: usageType, notes: notes || null })
+      await api.tracks.create({
+        scene_id: sceneId,
+        song_id: songId,
+        usage_type: usageType,
+        start_time_seconds: start,
+        end_time_seconds: end,
+        notes: notes || null,
+      })
       toast.success('Track added')
       onCreated()
     } catch (err) {
@@ -336,7 +365,18 @@ function AddTrackDialog({ sceneId, onCreated }: { sceneId: string; onCreated: ()
         <div className="space-y-4 py-4">
           <div className="space-y-1.5">
             <Label htmlFor="track-song">Song</Label>
-            <Select value={songId} onValueChange={v => setSongId(v ?? '')} disabled={songsLoading}>
+            <Select
+              value={songId}
+              onValueChange={v => {
+                setSongId(v ?? '')
+                const song = songs?.find(s => s.id === v)
+                if (song) {
+                  setStartTime('0')
+                  setEndTime(String(song.duration_seconds))
+                }
+              }}
+              disabled={songsLoading}
+            >
               <SelectTrigger id="track-song" className="w-full">
                 <SelectValue placeholder={songsLoading ? 'Loading songs...' : 'Select a song'} />
               </SelectTrigger>
@@ -360,6 +400,35 @@ function AddTrackDialog({ sceneId, onCreated }: { sceneId: string; onCreated: ()
               </SelectContent>
             </Select>
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="track-start">Start (s)</Label>
+              <Input
+                id="track-start"
+                type="number"
+                min={0}
+                max={selectedSong?.duration_seconds}
+                value={startTime}
+                onChange={e => setStartTime(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="track-end">End (s)</Label>
+              <Input
+                id="track-end"
+                type="number"
+                min={0}
+                max={selectedSong?.duration_seconds}
+                value={endTime}
+                onChange={e => setEndTime(e.target.value)}
+              />
+            </div>
+          </div>
+          {selectedSong && (
+            <p className="text-[12px] text-muted-foreground">
+              Song duration: {formatTime(selectedSong.duration_seconds)}. The clip must fit within it.
+            </p>
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="track-notes">Notes</Label>
             <Textarea id="track-notes" value={notes} onChange={e => setNotes(e.target.value)} />
