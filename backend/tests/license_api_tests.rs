@@ -76,6 +76,7 @@ impl ApiTestContext {
             movie_repo.clone(),
             song_repo.clone(),
             label_repo.clone(),
+            user_repo.clone(),
             events_tx.clone(),
         ));
 

@@ -55,6 +55,7 @@ impl TestContext {
             movie_repo.clone(),
             song_repo.clone(),
             label_repo.clone(),
+            user_repo.clone(),
             broadcast::channel(16).0,
         );
 

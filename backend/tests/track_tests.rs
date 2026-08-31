@@ -43,6 +43,7 @@ impl TestContext {
             scene_repo.clone(),
             song_repo.clone(),
             movie_repo.clone(),
+            user_repo.clone(),
         );
 
         Self {
