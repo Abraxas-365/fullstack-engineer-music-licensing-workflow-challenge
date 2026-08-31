@@ -1,4 +1,4 @@
-import { del, get, getAccessToken, post, put, setAccessToken } from './http'
+import { del, get, getAccessToken, getBaseUrl, post, put, setAccessToken } from './http'
 import type {
   Api,
   AuthApi,
@@ -83,7 +83,8 @@ const licenses: LicensesApi = {
 
     void (async () => {
       try {
-        const res = await fetch('/api/licenses/events', {
+        const url = new URL(getBaseUrl() + '/licenses/events', window.location.origin).toString()
+        const res = await fetch(url, {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
           signal: controller.signal,
         })

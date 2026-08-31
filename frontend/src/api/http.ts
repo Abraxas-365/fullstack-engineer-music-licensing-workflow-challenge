@@ -1,7 +1,7 @@
 import { ApiError } from './error'
 import type { ErrorResponse } from '@/types'
 
-const BASE_URL = '/api'
+const BASE_URL = import.meta.env.VITE_API_URL || '/api'
 
 let accessToken: string | null = null
 
@@ -11,6 +11,10 @@ export function setAccessToken(token: string | null) {
 
 export function getAccessToken(): string | null {
   return accessToken
+}
+
+export function getBaseUrl(): string {
+  return BASE_URL
 }
 
 interface RequestOptions {
@@ -29,7 +33,7 @@ function buildUrl(path: string, query?: RequestOptions['query']): string {
       }
     }
   }
-  return url.pathname + url.search
+  return url.toString()
 }
 
 /** Thin fetch wrapper for the real backend: JSON in/out, bearer auth,
