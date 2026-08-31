@@ -33,7 +33,7 @@ export function RightsSongDetailPage() {
   const persona = useRightsPersona()
   const { data, loading, error, reload } = useAsync(
     () => loadDetail(persona, songId),
-    [persona.id, songId, getApiMode()],
+    [persona.id, persona.labelId, persona.user.id, songId, getApiMode()],
   )
 
   if (error) return <EmptyState title="Song unavailable" description={error.message} />

@@ -1,6 +1,6 @@
 import { Outlet, useLocation } from 'react-router-dom'
 import { AppLayout } from '@/components/app-layout'
-import { CURRENT_USER } from '@/lib/current-user'
+import { useAuth } from '@/lib/auth'
 import { LayoutDashboard, Clapperboard, FileSignature } from 'lucide-react'
 
 const NAV_GROUPS = [
@@ -18,6 +18,7 @@ const NAV_ITEMS = NAV_GROUPS.flatMap(group => group.items)
 
 export function StudioLayout() {
   const location = useLocation()
+  const { user } = useAuth()
 
   // Highlight the closest matching top-level section (e.g. /studio/movies/123 -> /studio/movies)
   const activeHref = [...NAV_ITEMS]
@@ -29,7 +30,7 @@ export function StudioLayout() {
     <AppLayout
       navGroups={NAV_GROUPS}
       activeHref={activeHref}
-      userName={CURRENT_USER.name}
+      userName={user?.name ?? 'User'}
       userRole="Producer"
       activePersona="studio"
     >

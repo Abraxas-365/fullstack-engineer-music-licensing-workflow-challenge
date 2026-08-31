@@ -1,9 +1,10 @@
 import { Outlet, useLocation } from 'react-router-dom'
 import { AppLayout } from '@/components/app-layout'
-import { useRightsPersona } from '@/lib/rights-persona'
+import { useRightsPersona, RealPersonaProvider } from '@/lib/rights-persona'
+import { getApiMode } from '@/api'
 import { Inbox, LayoutDashboard, LibraryBig, Users } from 'lucide-react'
 
-export function RightsLayout() {
+function RightsLayoutInner() {
   const location = useLocation()
   const persona = useRightsPersona()
 
@@ -37,4 +38,15 @@ export function RightsLayout() {
       <Outlet />
     </AppLayout>
   )
+}
+
+export function RightsLayout() {
+  if (getApiMode() === 'real') {
+    return (
+      <RealPersonaProvider>
+        <RightsLayoutInner />
+      </RealPersonaProvider>
+    )
+  }
+  return <RightsLayoutInner />
 }

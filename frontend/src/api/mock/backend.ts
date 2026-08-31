@@ -630,10 +630,10 @@ const authApi: AuthApi = {
     }
     return delay(mockTokenPair())
   },
-  async refresh() {
+  async refresh(_refreshToken) {
     return delay(mockTokenPair())
   },
-  async logout() {
+  async logout(_refreshToken) {
     return delay(undefined)
   },
   async logoutAll() {

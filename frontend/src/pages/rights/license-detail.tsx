@@ -28,7 +28,7 @@ export function RightsLicenseDetailPage() {
   const persona = useRightsPersona()
   const { data, loading, error, reload } = useAsync(
     () => loadRightsLicenseDetail(persona, licenseId),
-    [persona.id, licenseId, getApiMode()],
+    [persona.id, persona.labelId, persona.user.id, licenseId, getApiMode()],
   )
 
   useEffect(() => {

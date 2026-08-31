@@ -24,7 +24,7 @@ import { Switch } from '@/components/ui/switch'
 import { api, getApiMode } from '@/api'
 import { useAsync } from '@/lib/use-async'
 import { userName } from '@/lib/user-name'
-import { CURRENT_USER } from '@/lib/current-user'
+import { useAuth } from '@/lib/auth'
 import { cn, formatCurrency, formatRelativeTime } from '@/lib/utils'
 import {
   ArrowRight,
@@ -410,6 +410,7 @@ function StudioActions({
 }
 
 function CounterOfferDialog({ licenseId, onSubmitted }: { licenseId: string; onSubmitted: () => void }) {
+  const { user } = useAuth()
   const [fee, setFee] = useState('')
   const [territory, setTerritory] = useState('')
   const [exclusive, setExclusive] = useState(false)
@@ -442,7 +443,7 @@ function CounterOfferDialog({ licenseId, onSubmitted }: { licenseId: string; onS
       <form onSubmit={handleSubmit}>
         <DialogHeader>
           <DialogTitle>Counter-offer</DialogTitle>
-          <DialogDescription>Propose new terms to the rights holder as {CURRENT_USER.name}.</DialogDescription>
+          <DialogDescription>Propose new terms to the rights holder as {user?.name ?? 'you'}.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-3">

@@ -28,7 +28,7 @@ export function RightsInboxPage() {
   const persona = useRightsPersona()
   const { data, loading, error, reload } = useAsync(
     () => loadRightsLicenses(persona),
-    [persona.id, getApiMode()],
+    [persona.id, persona.labelId, persona.user.id, getApiMode()],
   )
   const [filter, setFilter] = useState<(typeof FILTERS)[number]['value']>('NEEDS_RESPONSE')
   const [query, setQuery] = useState('')

@@ -21,7 +21,7 @@ export function RightsCatalogPage() {
   const persona = useRightsPersona()
   const { data: songs, loading, error, reload } = useAsync(
     () => loadRightsSongs(persona),
-    [persona.id, getApiMode()],
+    [persona.id, persona.labelId, persona.user.id, getApiMode()],
   )
   const [query, setQuery] = useState('')
   const visibleSongs = useMemo(() => {

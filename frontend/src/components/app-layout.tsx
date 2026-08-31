@@ -1,5 +1,6 @@
 import { BriefcaseBusiness, Check, ChevronsUpDown, LogOut, Moon, Radio, Sun } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '@/lib/auth'
 import {
   Sidebar,
   SidebarContent,
@@ -64,6 +65,7 @@ function UserMenu({
 }) {
   const { theme, toggleTheme } = useTheme()
   const [apiMode, setApiMode] = useApiMode()
+  const { logout } = useAuth()
   const navigate = useNavigate()
 
   function selectWorkspace(persona: RightsPersonaId | 'studio') {
@@ -130,7 +132,7 @@ function UserMenu({
           <span className="text-[11px] text-muted-foreground">{apiMode === 'real' ? 'Live' : 'Mock'}</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled>
+        <DropdownMenuItem onClick={async () => { await logout(); navigate('/login') }}>
           <LogOut />
           Sign out
         </DropdownMenuItem>

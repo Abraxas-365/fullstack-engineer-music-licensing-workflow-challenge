@@ -24,7 +24,7 @@ export function RightsDashboardPage() {
   const persona = useRightsPersona()
   const { data, loading, reload } = useAsync(
     () => loadDashboard(persona),
-    [persona.id, getApiMode()],
+    [persona.id, persona.labelId, persona.user.id, getApiMode()],
   )
 
   useEffect(() => api.licenses.subscribeEvents(reload), [reload])
