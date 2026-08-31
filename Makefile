@@ -1,7 +1,7 @@
 .PHONY: help up up-build down logs ps \
         backend-run backend-build backend-test backend-check backend-fmt backend-clippy \
         frontend-dev frontend-build frontend-lint frontend-install \
-        infra-init infra-plan infra-apply infra-validate infra-fmt infra-lint \
+        infra-init infra-init-local infra-plan infra-apply infra-validate infra-fmt infra-lint \
         clean env
 
 help:
@@ -30,7 +30,8 @@ help:
 	@echo "  make frontend-lint    - npm run lint"
 	@echo ""
 	@echo "Infra (Terraform, in infra/terraform):"
-	@echo "  make infra-init     - terraform init"
+	@echo "  make infra-init     - terraform init with real backend config (requires infra/terraform/backend-config.hcl)"
+	@echo "  make infra-init-local - terraform init without a remote backend (for validate/lint only)"
 	@echo "  make infra-validate - terraform validate"
 	@echo "  make infra-fmt      - terraform fmt -recursive"
 	@echo "  make infra-lint     - tflint --recursive"
@@ -88,7 +89,10 @@ frontend-lint:
 	cd frontend && npm run lint
 
 infra-init:
-	cd infra/terraform && terraform init
+	cd infra/terraform && terraform init -backend-config=backend-config.hcl
+
+infra-init-local:
+	cd infra/terraform && terraform init -backend=false
 
 infra-validate:
 	cd infra/terraform && terraform validate

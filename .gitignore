@@ -7,5 +7,6 @@ dist/
 *.tfstate
 *.tfstate.*
 *.tfplan
+backend-config.hcl
 crash.log
 crash.*.log

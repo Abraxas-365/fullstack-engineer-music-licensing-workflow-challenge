@@ -42,11 +42,36 @@ The SPA is static (HTML/JS/CSS) — S3 + CloudFront serves it without running a 
 - An AWS account + credentials configured (`aws configure` or env vars)
 - Docker, to build and push the backend image to ECR
 
-## Deploy
+## One-time bootstrap: remote state
+
+Terraform state is stored in S3 (with DynamoDB locking) instead of locally, so both your machine and the CI deploy workflow read/write the same state. Create these once, by hand (chicken-and-egg: Terraform can't manage the bucket it stores its own state in):
+
+```bash
+aws s3api create-bucket --bucket <your-unique-bucket-name> --region us-east-1
+aws s3api put-bucket-versioning --bucket <your-unique-bucket-name> \
+  --versioning-configuration Status=Enabled
+
+aws dynamodb create-table \
+  --table-name terraform-locks \
+  --attribute-definitions AttributeName=LockID,AttributeType=S \
+  --key-schema AttributeName=LockID,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST
+```
+
+Then create `infra/terraform/backend-config.hcl` (gitignored — every environment/developer points at the same bucket, but the file itself isn't committed):
+
+```hcl
+bucket         = "<your-unique-bucket-name>"
+key            = "music-licensing/production.tfstate"
+region         = "us-east-1"
+dynamodb_table = "terraform-locks"
+```
+
+## Deploy (local / manual)
 
 ```bash
 cd infra/terraform
-terraform init
+terraform init -backend-config=backend-config.hcl
 terraform apply
 ```
 
@@ -87,6 +112,10 @@ aws cloudfront create-invalidation \
   --paths "/*"
 ```
 
+## Deploy (CI, manual trigger)
+
+The steps above are automated in [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml), triggered manually from the GitHub Actions tab (`workflow_dispatch`) — merging to `main` never deploys by itself. See [CI/CD](#cicd) below for setup and how it works.
+
 ## Outputs
 
 After `terraform apply`, useful values are available via `terraform output`:
@@ -95,11 +124,36 @@ After `terraform apply`, useful values are available via `terraform output`:
 - `backend_url` — ALB URL for the API
 - `backend_ecr_repository_url` — where to push backend images
 - `frontend_bucket_name` / `cloudfront_distribution_id` — for frontend deploys
+- `ecs_cluster_name` / `ecs_service_name` — for forcing a redeploy
 - `database_endpoint` — RDS address (not publicly reachable; for reference/debugging via a bastion or ECS Exec)
+
+## CI/CD
+
+Two workflows, deliberately separated so a failing build/test can never block someone from merging a PR into `main`, and so nothing ever deploys to AWS without an explicit human action:
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| [`ci.yml`](../.github/workflows/ci.yml) | `pull_request` → `main`, `push` → `main` | Backend: `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`. Frontend: `npm run lint`, `npm run build`. Terraform: `fmt -check`, `validate`, `tflint`. No deploy. |
+| [`deploy.yml`](../.github/workflows/deploy.yml) | `workflow_dispatch` only | Re-runs backend tests as a safety net, then `terraform apply`, builds + pushes the backend image to ECR tagged with the commit SHA, forces an ECS rollout, builds the frontend against the live backend URL, syncs it to S3, and invalidates CloudFront. |
+
+`ci.yml` is meant to be a **required status check** on `main` (Settings → Branches → Branch protection rule → require `Backend (fmt, clippy, test)` and `Frontend (lint, build)` to pass before merging). `deploy.yml` has no relationship to branch protection — it can be run against any branch/commit from the Actions tab, and requires typing `deploy` into the confirmation input to run.
+
+### One-time GitHub setup for `deploy.yml`
+
+1. **AWS OIDC role** (no long-lived AWS keys stored in GitHub): create an IAM OIDC identity provider for `token.actions.githubusercontent.com` and a role trusting it, scoped to this repo. AWS's guide: [Configuring OpenID Connect in Amazon Web Services](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services). Grant the role permissions for ECS, ECR, S3, CloudFront, Secrets Manager, and the Terraform-managed resources (or attach `AdministratorAccess` for a take-home/non-production setup).
+2. In the repo, create a **`production` environment** (Settings → Environments) — optionally with required reviewers, so `deploy.yml`'s `environment: production` step needs an approval click before it runs.
+3. Add these **repository secrets** (Settings → Secrets and variables → Actions):
+   - `AWS_DEPLOY_ROLE_ARN` — the IAM role ARN from step 1
+   - `TF_STATE_BUCKET` — the S3 bucket created in the bootstrap step above
+   - `TF_STATE_LOCK_TABLE` — `terraform-locks` (or whatever you named it)
+
+### Running a deploy
+
+Actions tab → "Deploy to AWS (production)" → Run workflow → type `deploy` in the confirmation box. The job graph is `guard` (checks the confirmation text) → `test` (backend tests) → `deploy` (apply, build, push, roll out).
+
+
 
 ## Notes / things intentionally left out for a take-home scope
 
 - **Custom domains + ACM certs**: supported via `frontend_domain_aliases` / `cloudfront_certificate_arn` (CloudFront, must be us-east-1) and `alb_certificate_arn` (ALB, same region as `aws_region`), but left unset by default — without them the ALB serves plain HTTP and CloudFront uses its default `*.cloudfront.net` certificate.
-- **Remote state**: no S3/DynamoDB backend configured; state is local. For a real team setup, add a `backend "s3" {}` block in `versions.tf`.
-- **CI/CD wiring** (build → push to ECR → `terraform apply` → sync S3 → invalidate CloudFront) is not automated here; the steps above are manual but map directly onto a GitHub Actions job.
 - **Single NAT gateway** (not one per AZ) to keep cost down — acceptable for this workload, would add one per AZ for production HA.
