@@ -141,7 +141,7 @@ pub async fn get_track_license(
 ) -> Result<HttpResponse, AppError> {
     auth.require_scope(scopes::SCOPE_LICENSES_READ)?;
     let license = svc
-        .get_by_track(&TrackId::from_string(path.into_inner()))
+        .latest_by_track(&TrackId::from_string(path.into_inner()))
         .await?;
     match license {
         Some(l) => {

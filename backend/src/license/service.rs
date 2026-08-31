@@ -222,6 +222,20 @@ impl LicenseService {
         self.license_repo.get_by_track(track_id).await
     }
 
+    /// Most recent license request for a track, regardless of status
+    /// (including rejected/cancelled). Used for display purposes.
+    pub async fn latest_by_track(
+        &self,
+        track_id: &TrackId,
+    ) -> Result<Option<LicenseRequest>, AppError> {
+        Ok(self
+            .license_repo
+            .list_by_track(track_id)
+            .await?
+            .into_iter()
+            .next())
+    }
+
     /// Full negotiation history, oldest offer first.
     pub async fn list_offers(
         &self,
