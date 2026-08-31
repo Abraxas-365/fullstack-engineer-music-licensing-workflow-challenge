@@ -8,11 +8,12 @@ export function cacheUserName(userId: string, name: string) {
   nameCache.set(userId, name)
 }
 
-/** Best-effort display name for a user id. Falls back to a short id
- *  fragment for ids the mock seed data doesn't know about (e.g. ones
- *  created via the "real" backend). */
-export function userName(userId: string | null | undefined): string {
+/** Best-effort display name for a user id. Prefers a name resolved by the
+ *  backend response itself (`nameHint`, e.g. `created_by_name`); falls back
+ *  to the cache, then the mock seed data, then a short id fragment. */
+export function userName(userId: string | null | undefined, nameHint?: string | null): string {
   if (!userId) return 'Unknown'
+  if (nameHint) return nameHint
   // Check runtime cache first (populated by auth context)
   const cached = nameCache.get(userId)
   if (cached) return cached

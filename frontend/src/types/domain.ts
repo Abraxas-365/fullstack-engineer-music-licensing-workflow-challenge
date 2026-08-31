@@ -13,12 +13,14 @@ export interface Movie {
   release_year: number | null
   director: string | null
   created_by: UUID
+  created_by_name: string | null
   created_at: string
   updated_at: string
 }
 
 export interface MovieMember {
   user_id: UUID
+  user_name: string | null
   role: MovieRole
   joined_at: string
 }
@@ -42,7 +44,9 @@ export interface Song {
   id: UUID
   title: string
   artist_id: UUID
+  artist_name: string | null
   label_id: UUID | null
+  label_name: string | null
   album: string | null
   duration_seconds: number
   genre: string | null
@@ -65,6 +69,7 @@ export interface Track {
   end_time_seconds: number
   duration_seconds: number
   created_by: UUID
+  created_by_name: string | null
   notes: string | null
   created_at: string
   updated_at: string
@@ -84,6 +89,7 @@ export interface Label {
 
 export interface LabelMember {
   user_id: UUID
+  user_name: string | null
   role: LabelRole
   joined_at: string
 }
@@ -97,8 +103,10 @@ export interface LicenseRequest {
   track_id: UUID
   status: LicenseStatus
   requested_by: UUID
+  requested_by_name: string | null
   requested_at: string
   resolved_by: UUID | null
+  resolved_by_name: string | null
   resolved_at: string | null
   rejection_reason: string | null
   created_at: string
@@ -111,6 +119,7 @@ export interface LicenseOffer {
   offer_number: number
   side: NegotiationSide
   proposed_by: UUID
+  proposed_by_name: string | null
   license_fee: number | null
   currency: string | null
   territory: string | null
