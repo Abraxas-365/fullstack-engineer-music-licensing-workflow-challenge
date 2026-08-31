@@ -219,10 +219,10 @@ pub fn scopes_contain(scopes: &[String], target: &str) -> bool {
         if scope == SCOPE_ALL || scope == target {
             return true;
         }
-        if let Some(prefix) = scope.strip_suffix(":*") {
-            if target.starts_with(&format!("{prefix}:")) {
-                return true;
-            }
+        if let Some(prefix) = scope.strip_suffix(":*")
+            && target.starts_with(&format!("{prefix}:"))
+        {
+            return true;
         }
     }
     false

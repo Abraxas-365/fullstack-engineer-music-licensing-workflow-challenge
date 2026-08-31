@@ -56,12 +56,12 @@ impl AuthService {
             .user_repo
             .get_by_email(&req.email)
             .await?
-            .ok_or_else(|| AuthError::invalid_credentials())?;
+            .ok_or_else(AuthError::invalid_credentials)?;
 
         let password_hash = user
             .password_hash
             .as_ref()
-            .ok_or_else(|| AuthError::invalid_credentials())?;
+            .ok_or_else(AuthError::invalid_credentials)?;
 
         let valid = self
             .password_svc
@@ -130,7 +130,7 @@ impl AuthService {
             .token_repo
             .get_refresh_token(refresh_token)
             .await?
-            .ok_or_else(|| AuthError::invalid_refresh_token())?;
+            .ok_or_else(AuthError::invalid_refresh_token)?;
 
         if !stored.is_valid() {
             return Err(if stored.is_revoked {
@@ -153,7 +153,7 @@ impl AuthService {
             .user_repo
             .get_by_id(&user_id)
             .await?
-            .ok_or_else(|| UserError::not_found())?;
+            .ok_or_else(UserError::not_found)?;
 
         if !user.can_login() {
             return Err(AuthError::account_disabled());

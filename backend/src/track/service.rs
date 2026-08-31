@@ -117,7 +117,7 @@ impl TrackService {
         self.track_repo
             .get_by_id(id)
             .await?
-            .ok_or_else(|| TrackError::not_found())
+            .ok_or_else(TrackError::not_found)
     }
 
     pub async fn list_by_scene(
@@ -162,13 +162,13 @@ impl TrackService {
                     .with_detail("field", "end_time_seconds"),
             );
         }
-        if let Some(song) = self.song_repo.get_by_id(&track.song_id).await? {
-            if track.end_time_seconds > song.duration_seconds {
-                return Err(
-                    AppError::validation("End time cannot exceed the song's duration")
-                        .with_detail("field", "end_time_seconds"),
-                );
-            }
+        if let Some(song) = self.song_repo.get_by_id(&track.song_id).await?
+            && track.end_time_seconds > song.duration_seconds
+        {
+            return Err(
+                AppError::validation("End time cannot exceed the song's duration")
+                    .with_detail("field", "end_time_seconds"),
+            );
         }
         if let Some(notes) = req.notes {
             track.notes = Some(notes);

@@ -234,11 +234,11 @@ pub struct UpdateUserRequest {
 
 impl UpdateUserRequest {
     pub fn validate(&self) -> Result<(), AppError> {
-        if let Some(ref name) = self.name {
-            if name.trim().len() < 2 {
-                return Err(AppError::validation("Name must be at least 2 characters")
-                    .with_detail("field", "name"));
-            }
+        if let Some(ref name) = self.name
+            && name.trim().len() < 2
+        {
+            return Err(AppError::validation("Name must be at least 2 characters")
+                .with_detail("field", "name"));
         }
         Ok(())
     }

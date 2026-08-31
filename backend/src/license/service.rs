@@ -207,7 +207,7 @@ impl LicenseService {
         self.license_repo
             .get_by_id(id)
             .await?
-            .ok_or_else(|| LicenseError::not_found())
+            .ok_or_else(LicenseError::not_found)
     }
 
     pub async fn get_by_track(
