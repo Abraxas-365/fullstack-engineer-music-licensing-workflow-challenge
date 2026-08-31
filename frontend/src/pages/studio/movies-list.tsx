@@ -200,7 +200,7 @@ function CreateMovieDialog({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <DialogContent>
+    <DialogContent className="sm:max-w-lg">
       <form onSubmit={handleSubmit}>
         <DialogHeader>
           <DialogTitle>New movie</DialogTitle>
