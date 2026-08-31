@@ -257,7 +257,7 @@ export function StudioMovieDetailPage() {
               <CardContent className="divide-y divide-border py-0">
                 {data.members.map(member => (
                   <div key={member.user_id} className="flex items-center justify-between py-3">
-                    <UserAvatarWithInfo name={userName(member.user_id)} subtitle={ROLE_TITLE[member.role]} />
+                    <UserAvatarWithInfo name={userName(member.user_id, member.user_name)} subtitle={ROLE_TITLE[member.role]} />
                     <MovieRoleBadge role={member.role} />
                   </div>
                 ))}

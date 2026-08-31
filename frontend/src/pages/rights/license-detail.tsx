@@ -97,11 +97,11 @@ export function RightsLicenseDetailPage() {
 
           <NegotiationTimeline
             status={data.license.status}
-            offers={offers.map(offer => ({ ...offer, proposer_name: userName(offer.proposed_by) }))}
+            offers={offers.map(offer => ({ ...offer, proposer_name: userName(offer.proposed_by, offer.proposed_by_name) }))}
             songTitle={data.song.title}
             sceneTitle={data.scene?.title}
             movieTitle={data.movie?.title}
-            resolvedByName={data.license.resolved_by ? userName(data.license.resolved_by) : undefined}
+            resolvedByName={data.license.resolved_by ? userName(data.license.resolved_by, data.license.resolved_by_name) : undefined}
           />
 
           {persona.canNegotiate && needsRightsResponse && <RightsActions licenseId={data.license.id} latest={latest} onChanged={reload} />}

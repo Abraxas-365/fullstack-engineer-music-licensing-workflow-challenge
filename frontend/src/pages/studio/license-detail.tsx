@@ -139,7 +139,7 @@ export function StudioLicenseDetailPage() {
   const latestOffer = sortedOffers[sortedOffers.length - 1]
   const previousOffer = sortedOffers[sortedOffers.length - 2]
   const waitingOnRightsHolder = latestOffer?.side === 'MOVIE_TEAM'
-  const timelineOffers = data?.offers.map(o => ({ ...o, proposer_name: userName(o.proposed_by) })) ?? []
+  const timelineOffers = data?.offers.map(o => ({ ...o, proposer_name: userName(o.proposed_by, o.proposed_by_name) })) ?? []
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -232,7 +232,7 @@ export function StudioLicenseDetailPage() {
             songTitle={data.song?.title}
             sceneTitle={data.scene?.title}
             movieTitle={data.movieTitle}
-            resolvedByName={data.license.resolved_by ? userName(data.license.resolved_by) : undefined}
+            resolvedByName={data.license.resolved_by ? userName(data.license.resolved_by, data.license.resolved_by_name) : undefined}
           />
 
           <StudioActions

@@ -60,7 +60,7 @@ export function RightsCatalogPage() {
             <Link key={song.id} to={`/rights/catalog/${song.id}`} className="block">
               <SongCard
                 song={song}
-                artistName={userName(song.artist_id)}
+                artistName={userName(song.artist_id, song.artist_name)}
                 labelName={persona.labelName ?? 'Independent'}
                 className="h-full hover:border-primary/35"
               />
@@ -91,7 +91,7 @@ function AddSongDialog({ persona, onCreated }: { persona: ReturnType<typeof useR
     if (!members) return []
     return members
       .filter(m => m.role === 'ARTIST')
-      .map(m => ({ value: m.user_id, label: userName(m.user_id), description: m.role }))
+      .map(m => ({ value: m.user_id, label: userName(m.user_id, m.user_name), description: m.role }))
   }, [members])
 
   async function submit(event: React.FormEvent) {

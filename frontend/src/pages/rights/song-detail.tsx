@@ -51,7 +51,7 @@ export function RightsSongDetailPage() {
         <>
           <Card>
             <CardContent className="grid gap-4 py-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Metadata label="Artist" value={userName(data.song.artist_id)} />
+              <Metadata label="Artist" value={userName(data.song.artist_id, data.song.artist_name)} />
               <Metadata label="Representation" value={persona.labelName ?? 'Independent'} />
               <Metadata label="ISRC" value={data.song.isrc ?? 'Not assigned'} mono />
               <Metadata label="Placements" value={String(data.placements.length)} />

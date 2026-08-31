@@ -276,6 +276,9 @@ export function StudioDashboardPage() {
             <CardContent className="divide-y divide-border py-0">
               {recentActivity.map(item => {
                 const actorId = item.license.resolved_by ?? item.license.requested_by
+                const actorName = item.license.resolved_by
+                  ? item.license.resolved_by_name
+                  : item.license.requested_by_name
                 const verb = item.license.status === 'APPROVED'
                   ? 'approved'
                   : item.license.status === 'REJECTED'
@@ -289,10 +292,10 @@ export function StudioDashboardPage() {
                     className="flex items-center gap-3 py-3 cursor-pointer"
                     onClick={() => navigate(`/studio/licenses/${item.license.id}`)}
                   >
-                    <UserAvatar name={userName(actorId)} size="sm" />
+                    <UserAvatar name={userName(actorId, actorName)} size="sm" />
                     <div className="min-w-0 flex-1">
                       <p className="text-[13px] truncate">
-                        <span className="font-medium">{userName(actorId)}</span>{' '}
+                        <span className="font-medium">{userName(actorId, actorName)}</span>{' '}
                         {verb} the license for{' '}
                         <span className="font-medium">{item.song?.title ?? 'a track'}</span>
                         {item.movie ? ` in "${item.movie.title}"` : ''}

@@ -74,9 +74,9 @@ export function RightsMembersPage() {
             return (
               <Card key={member.user_id}>
                 <CardContent className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center">
-                  <UserAvatar name={userName(member.user_id)} role={member.role === 'ARTIST' ? 'Artist' : 'Label Manager'} />
+                  <UserAvatar name={userName(member.user_id, member.user_name)} role={member.role === 'ARTIST' ? 'Artist' : 'Label Manager'} />
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold">{userName(member.user_id)}</p><LabelRoleBadge role={member.role} />{isCurrentUser && <span className="text-[10px] text-muted-foreground">You</span>}</div>
+                    <div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold">{userName(member.user_id, member.user_name)}</p><LabelRoleBadge role={member.role} />{isCurrentUser && <span className="text-[10px] text-muted-foreground">You</span>}</div>
                     <p className="mt-1 text-[11px] text-muted-foreground">Joined {formatRelativeTime(member.joined_at)} · {member.user_id.slice(0, 12)}…</p>
                   </div>
                   {persona.canManageMembers && !isCurrentUser && (
@@ -88,7 +88,7 @@ export function RightsMembersPage() {
                       >
                         <option value="OWNER">Owner</option><option value="REP">Rep</option><option value="ARTIST">Artist</option>
                       </select>
-                      <Button variant="ghost" size="icon-sm" aria-label={`Remove ${userName(member.user_id)}`} onClick={() => removeMember(member.user_id)}><Trash2 /></Button>
+                      <Button variant="ghost" size="icon-sm" aria-label={`Remove ${userName(member.user_id, member.user_name)}`} onClick={() => removeMember(member.user_id)}><Trash2 /></Button>
                     </div>
                   )}
                 </CardContent>

@@ -321,7 +321,9 @@ function AddTrackDialog({ sceneId, onCreated }: { sceneId: string; onCreated: ()
     return songs.map(song => ({
       value: song.id,
       label: song.title,
-      description: [userName(song.artist_id), song.album, song.genre].filter(Boolean).join(' · '),
+      description: [userName(song.artist_id, song.artist_name), song.album, song.genre]
+        .filter(Boolean)
+        .join(' · '),
     }))
   }, [songs])
 
