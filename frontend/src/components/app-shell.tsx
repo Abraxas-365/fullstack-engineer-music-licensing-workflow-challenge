@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronsUpDown, LogOut, Menu, Moon, Radio, Sun } from 'lucide-react'
+import { ChevronsUpDown, LogOut, Menu, Moon, Sun } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
@@ -15,7 +15,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { UserAvatar } from '@/components/user-avatar'
 import { NotificationBell } from '@/components/notification-bell'
-import { useApiMode } from '@/api/use-api-mode'
 import { useTheme } from '@/components/theme-provider'
 import type { PlatformRole } from '@/types'
 
@@ -66,7 +65,6 @@ function SidebarItems({ items, activeHref, onNavigate }: Omit<SidebarProps, 'use
 /** Account menu pinned to the bottom of the sidebar: identity + dev/theme controls. */
 function UserMenu({ userName = 'User', userRole }: { userName?: string; userRole?: PlatformRole }) {
   const { theme, toggleTheme } = useTheme()
-  const [apiMode, setApiMode] = useApiMode()
 
   return (
     <DropdownMenu>
@@ -96,17 +94,6 @@ function UserMenu({ userName = 'User', userRole }: { userName?: string; userRole
             Theme
           </span>
           <span className="text-[11px] text-muted-foreground capitalize">{theme}</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          closeOnClick={false}
-          onClick={() => setApiMode(apiMode === 'real' ? 'mock' : 'real')}
-          className="justify-between"
-        >
-          <span className="flex items-center gap-1.5">
-            <Radio />
-            API source
-          </span>
-          <span className="text-[11px] text-muted-foreground">{apiMode === 'real' ? 'Live' : 'Mock'}</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled>

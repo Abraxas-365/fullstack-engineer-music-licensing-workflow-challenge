@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, Check, ChevronsUpDown, LogOut, Moon, Radio, Sun } from 'lucide-react'
+import { BriefcaseBusiness, Check, ChevronsUpDown, LogOut, Moon, Sun } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
 import {
@@ -32,7 +32,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { UserAvatar } from '@/components/user-avatar'
 import { NotificationBell } from '@/components/notification-bell'
-import { useApiMode } from '@/api/use-api-mode'
 import { useTheme } from '@/components/theme-provider'
 import {
   RIGHTS_PERSONAS,
@@ -64,7 +63,6 @@ function UserMenu({
   activePersona?: RightsPersonaId | 'studio'
 }) {
   const { theme, toggleTheme } = useTheme()
-  const [apiMode, setApiMode] = useApiMode()
   const { logout } = useAuth()
   const navigate = useNavigate()
 
@@ -119,17 +117,6 @@ function UserMenu({
             Theme
           </span>
           <span className="text-[11px] text-muted-foreground capitalize">{theme}</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          closeOnClick={false}
-          onClick={() => setApiMode(apiMode === 'real' ? 'mock' : 'real')}
-          className="justify-between"
-        >
-          <span className="flex items-center gap-1.5">
-            <Radio />
-            API source
-          </span>
-          <span className="text-[11px] text-muted-foreground">{apiMode === 'real' ? 'Live' : 'Mock'}</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={async () => { await logout(); navigate('/login') }}>
