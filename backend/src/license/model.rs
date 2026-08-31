@@ -232,8 +232,10 @@ pub struct LicenseRequestResponse {
     pub track_id: TrackId,
     pub status: String,
     pub requested_by: UserId,
+    pub requested_by_name: Option<String>,
     pub requested_at: DateTime<Utc>,
     pub resolved_by: Option<UserId>,
+    pub resolved_by_name: Option<String>,
     pub resolved_at: Option<DateTime<Utc>>,
     pub rejection_reason: Option<String>,
     pub created_at: DateTime<Utc>,
@@ -247,13 +249,33 @@ impl From<LicenseRequest> for LicenseRequestResponse {
             track_id: lr.track_id,
             status: lr.status.as_str().to_string(),
             requested_by: lr.requested_by,
+            requested_by_name: None,
             requested_at: lr.requested_at,
             resolved_by: lr.resolved_by,
+            resolved_by_name: None,
             resolved_at: lr.resolved_at,
             rejection_reason: lr.rejection_reason,
             created_at: lr.created_at,
             updated_at: lr.updated_at,
         }
+    }
+}
+
+/// A [`LicenseRequest`] enriched with the names of the requester and
+/// resolver, resolved by the service layer via a batch lookup.
+#[derive(Debug, Clone)]
+pub struct LicenseRequestWithDetails {
+    pub license: LicenseRequest,
+    pub requested_by_name: Option<String>,
+    pub resolved_by_name: Option<String>,
+}
+
+impl From<&LicenseRequestWithDetails> for LicenseRequestResponse {
+    fn from(d: &LicenseRequestWithDetails) -> Self {
+        let mut res = LicenseRequestResponse::from(d.license.clone());
+        res.requested_by_name = d.requested_by_name.clone();
+        res.resolved_by_name = d.resolved_by_name.clone();
+        res
     }
 }
 
@@ -264,6 +286,7 @@ pub struct LicenseOfferResponse {
     pub offer_number: i32,
     pub side: String,
     pub proposed_by: UserId,
+    pub proposed_by_name: Option<String>,
     pub license_fee: Option<f64>,
     pub currency: Option<String>,
     pub territory: Option<String>,
@@ -283,6 +306,7 @@ impl From<LicenseOffer> for LicenseOfferResponse {
             offer_number: o.offer_number,
             side: o.side.as_str().to_string(),
             proposed_by: o.proposed_by,
+            proposed_by_name: None,
             license_fee: o.license_fee,
             currency: o.currency,
             territory: o.territory,
@@ -293,5 +317,21 @@ impl From<LicenseOffer> for LicenseOfferResponse {
             notes: o.notes,
             created_at: o.created_at,
         }
+    }
+}
+
+/// A [`LicenseOffer`] enriched with the proposer's name, resolved by the
+/// service layer via a batch lookup.
+#[derive(Debug, Clone)]
+pub struct LicenseOfferWithDetails {
+    pub offer: LicenseOffer,
+    pub proposed_by_name: Option<String>,
+}
+
+impl From<&LicenseOfferWithDetails> for LicenseOfferResponse {
+    fn from(d: &LicenseOfferWithDetails) -> Self {
+        let mut res = LicenseOfferResponse::from(d.offer.clone());
+        res.proposed_by_name = d.proposed_by_name.clone();
+        res
     }
 }

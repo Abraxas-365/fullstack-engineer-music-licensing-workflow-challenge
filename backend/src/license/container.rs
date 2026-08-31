@@ -4,6 +4,7 @@ use actix_web::web;
 use sqlx::PgPool;
 use tokio::sync::broadcast;
 
+use crate::iam::user::UserRepository;
 use crate::label::LabelRepository;
 use crate::movie::MovieRepository;
 use crate::scene::SceneRepository;
@@ -27,6 +28,7 @@ impl LicenseContainer {
         movie_repo: Arc<dyn MovieRepository>,
         song_repo: Arc<dyn SongRepository>,
         label_repo: Arc<dyn LabelRepository>,
+        user_repo: Arc<dyn UserRepository>,
     ) -> Self {
         let license_repo = Arc::new(PostgresLicenseRepository::new(pool));
         let (events_tx, _) = broadcast::channel::<LicenseEvent>(256);
@@ -37,6 +39,7 @@ impl LicenseContainer {
             movie_repo,
             song_repo,
             label_repo,
+            user_repo,
             events_tx,
         ));
         Self { svc }

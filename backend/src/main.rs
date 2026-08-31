@@ -76,6 +76,7 @@ async fn main() -> std::io::Result<()> {
         scene.repo.clone(),
         song.repo.clone(),
         movie.repo.clone(),
+        iam.user_repo.clone(),
     );
     let license = LicenseContainer::new(
         pool,
@@ -84,6 +85,7 @@ async fn main() -> std::io::Result<()> {
         movie.repo.clone(),
         song.repo.clone(),
         label.repo.clone(),
+        iam.user_repo.clone(),
     );
 
     // ── HTTP server ─────────────────────────────────────────────────────────

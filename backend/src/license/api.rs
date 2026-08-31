@@ -60,9 +60,11 @@ pub async fn create_license(
 ) -> Result<HttpResponse, AppError> {
     auth.require_scope(scopes::SCOPE_LICENSES_WRITE)?;
     let (license, offer) = svc.create_license(body.into_inner(), auth.user_id).await?;
+    let license = LicenseRequestResponse::from(&svc.to_detail(license).await?);
+    let offer = LicenseOfferResponse::from(&svc.to_offer_detail(offer).await?);
     Ok(HttpResponse::Created().json(serde_json::json!({
-        "license": LicenseRequestResponse::from(license),
-        "offer": LicenseOfferResponse::from(offer),
+        "license": license,
+        "offer": offer,
     })))
 }
 
@@ -88,7 +90,8 @@ pub async fn get_license(
     let license = svc
         .get_license(&LicenseRequestId::from_string(path.into_inner()))
         .await?;
-    Ok(HttpResponse::Ok().json(LicenseRequestResponse::from(license)))
+    let res = LicenseRequestResponse::from(&svc.to_detail(license).await?);
+    Ok(HttpResponse::Ok().json(res))
 }
 
 /// List offers for a license request
@@ -115,8 +118,12 @@ pub async fn list_offers(
     let offers = svc
         .list_offers(&LicenseRequestId::from_string(path.into_inner()))
         .await?;
-    let res: Vec<LicenseOfferResponse> =
-        offers.into_iter().map(LicenseOfferResponse::from).collect();
+    let res: Vec<LicenseOfferResponse> = svc
+        .to_offer_details(offers)
+        .await?
+        .iter()
+        .map(LicenseOfferResponse::from)
+        .collect();
     Ok(HttpResponse::Ok().json(res))
 }
 
@@ -151,7 +158,8 @@ pub async fn revise_draft(
             auth.user_id,
         )
         .await?;
-    Ok(HttpResponse::Ok().json(LicenseOfferResponse::from(offer)))
+    let res = LicenseOfferResponse::from(&svc.to_offer_detail(offer).await?);
+    Ok(HttpResponse::Ok().json(res))
 }
 
 /// Submit a draft license request
@@ -183,7 +191,8 @@ pub async fn submit(
             auth.user_id,
         )
         .await?;
-    Ok(HttpResponse::Ok().json(LicenseRequestResponse::from(license)))
+    let res = LicenseRequestResponse::from(&svc.to_detail(license).await?);
+    Ok(HttpResponse::Ok().json(res))
 }
 
 /// Counter the latest offer
@@ -218,7 +227,8 @@ pub async fn counter_offer(
             auth.user_id,
         )
         .await?;
-    Ok(HttpResponse::Ok().json(LicenseOfferResponse::from(offer)))
+    let res = LicenseOfferResponse::from(&svc.to_offer_detail(offer).await?);
+    Ok(HttpResponse::Ok().json(res))
 }
 
 /// Accept the latest offer
@@ -249,7 +259,8 @@ pub async fn accept(
             auth.user_id,
         )
         .await?;
-    Ok(HttpResponse::Ok().json(LicenseRequestResponse::from(license)))
+    let res = LicenseRequestResponse::from(&svc.to_detail(license).await?);
+    Ok(HttpResponse::Ok().json(res))
 }
 
 /// Reject the latest offer
@@ -283,7 +294,8 @@ pub async fn reject(
             body.into_inner().reason,
         )
         .await?;
-    Ok(HttpResponse::Ok().json(LicenseRequestResponse::from(license)))
+    let res = LicenseRequestResponse::from(&svc.to_detail(license).await?);
+    Ok(HttpResponse::Ok().json(res))
 }
 
 /// Cancel a license request
@@ -315,7 +327,8 @@ pub async fn cancel(
             auth.user_id,
         )
         .await?;
-    Ok(HttpResponse::Ok().json(LicenseRequestResponse::from(license)))
+    let res = LicenseRequestResponse::from(&svc.to_detail(license).await?);
+    Ok(HttpResponse::Ok().json(res))
 }
 
 /// Delete a draft license request

@@ -4,6 +4,7 @@ use chrono::Utc;
 use tokio::sync::broadcast;
 
 use crate::error::AppError;
+use crate::iam::user::{UserRepository, UserRepositoryExt};
 use crate::kernel::{LicenseRequestId, TrackId, UserId};
 use crate::label::{LabelRepository, LabelRole};
 use crate::movie::{MovieMember, MovieRepository, MovieRole};
@@ -13,8 +14,8 @@ use crate::track::TrackRepository;
 
 use super::error::LicenseError;
 use super::model::{
-    CreateLicenseRequest, LicenseEvent, LicenseEventKind, LicenseOffer, LicenseRequest,
-    LicenseStatus, NegotiationSide, OfferTerms,
+    CreateLicenseRequest, LicenseEvent, LicenseEventKind, LicenseOffer, LicenseOfferWithDetails,
+    LicenseRequest, LicenseRequestWithDetails, LicenseStatus, NegotiationSide, OfferTerms,
 };
 use super::port::LicenseRepository;
 
@@ -35,10 +36,12 @@ pub struct LicenseService {
     movie_repo: Arc<dyn MovieRepository>,
     song_repo: Arc<dyn SongRepository>,
     label_repo: Arc<dyn LabelRepository>,
+    user_repo: Arc<dyn UserRepository>,
     events_tx: broadcast::Sender<LicenseEvent>,
 }
 
 impl LicenseService {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         license_repo: Arc<dyn LicenseRepository>,
         track_repo: Arc<dyn TrackRepository>,
@@ -46,6 +49,7 @@ impl LicenseService {
         movie_repo: Arc<dyn MovieRepository>,
         song_repo: Arc<dyn SongRepository>,
         label_repo: Arc<dyn LabelRepository>,
+        user_repo: Arc<dyn UserRepository>,
         events_tx: broadcast::Sender<LicenseEvent>,
     ) -> Self {
         Self {
@@ -55,6 +59,7 @@ impl LicenseService {
             movie_repo,
             song_repo,
             label_repo,
+            user_repo,
             events_tx,
         }
     }
@@ -420,11 +425,66 @@ impl LicenseService {
         }
         Ok(())
     }
+
+    // ========================================================================
+    // Response enrichment
+    // ========================================================================
+
+    pub async fn to_detail(
+        &self,
+        license: LicenseRequest,
+    ) -> Result<LicenseRequestWithDetails, AppError> {
+        let mut ids: Vec<UserId> = vec![license.requested_by.clone()];
+        if let Some(resolved_by) = &license.resolved_by {
+            ids.push(resolved_by.clone());
+        }
+        let names = self.user_repo.resolve_names(ids).await?;
+
+        let requested_by_name = names.get(&license.requested_by).cloned();
+        let resolved_by_name = license
+            .resolved_by
+            .as_ref()
+            .and_then(|id| names.get(id).cloned());
+
+        Ok(LicenseRequestWithDetails {
+            license,
+            requested_by_name,
+            resolved_by_name,
+        })
+    }
+
+    pub async fn to_offer_details(
+        &self,
+        offers: Vec<LicenseOffer>,
+    ) -> Result<Vec<LicenseOfferWithDetails>, AppError> {
+        let names = self
+            .user_repo
+            .resolve_names(offers.iter().map(|o| o.proposed_by.clone()))
+            .await?;
+        Ok(offers
+            .into_iter()
+            .map(|o| {
+                let proposed_by_name = names.get(&o.proposed_by).cloned();
+                LicenseOfferWithDetails {
+                    offer: o,
+                    proposed_by_name,
+                }
+            })
+            .collect())
+    }
+
+    pub async fn to_offer_detail(
+        &self,
+        offer: LicenseOffer,
+    ) -> Result<LicenseOfferWithDetails, AppError> {
+        Ok(self.to_offer_details(vec![offer]).await?.remove(0))
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::iam::user::{User, UserFilter};
     use crate::kernel::{LabelId, MovieId, Paginated, PaginationOptions, SceneId, SongId};
     use crate::label::{Label, LabelMember, LabelRole};
     use crate::movie::{Movie, MovieFilter, MovieMember, MovieRole};
@@ -714,6 +774,9 @@ mod tests {
         async fn get_by_id(&self, _: &LabelId) -> Result<Option<Label>, AppError> {
             Ok(None)
         }
+        async fn get_by_ids(&self, _: &[LabelId]) -> Result<Vec<Label>, AppError> {
+            Ok(vec![])
+        }
         async fn get_by_name(&self, _: &str) -> Result<Option<Label>, AppError> {
             Ok(None)
         }
@@ -751,6 +814,36 @@ mod tests {
         }
         async fn get_user_labels(&self, _: &UserId) -> Result<Vec<Label>, AppError> {
             Ok(vec![])
+        }
+    }
+
+    struct MockUserRepo;
+    #[async_trait::async_trait]
+    impl UserRepository for MockUserRepo {
+        async fn get_by_id(&self, _: &UserId) -> Result<Option<User>, AppError> {
+            Ok(None)
+        }
+        async fn get_by_ids(&self, _: &[UserId]) -> Result<Vec<User>, AppError> {
+            Ok(vec![])
+        }
+        async fn get_by_email(&self, _: &str) -> Result<Option<User>, AppError> {
+            Ok(None)
+        }
+        async fn find(
+            &self,
+            _: &PaginationOptions,
+            _: &UserFilter,
+        ) -> Result<Paginated<User>, AppError> {
+            Ok(Paginated::new(vec![], 1, 10, 0))
+        }
+        async fn save(&self, _: &User) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn update(&self, _: &User) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn delete(&self, _: &UserId) -> Result<(), AppError> {
+            Ok(())
         }
     }
 
@@ -837,6 +930,7 @@ mod tests {
                 Arc::new(MockLabelRepo {
                     members: Mutex::new(label_members),
                 }),
+                Arc::new(MockUserRepo),
                 broadcast::channel(16).0,
             );
 
