@@ -122,6 +122,8 @@ impl TestContext {
             scene_id,
             song_id,
             usage_type: "BACKGROUND".into(),
+            start_time_seconds: 0,
+            end_time_seconds: 60,
             notes: None,
         }
     }
@@ -140,6 +142,8 @@ async fn test_repo_save_and_get_by_id() {
         scene.id.clone(),
         song.id.clone(),
         backend::track::UsageType::Background,
+        0,
+        60,
         user.id.clone(),
     );
     ctx.track_repo.save(&track).await.unwrap();
@@ -166,6 +170,8 @@ async fn test_repo_update() {
         scene.id.clone(),
         song.id.clone(),
         backend::track::UsageType::Background,
+        0,
+        60,
         user.id.clone(),
     );
     ctx.track_repo.save(&track).await.unwrap();
@@ -188,6 +194,8 @@ async fn test_repo_delete() {
         scene.id.clone(),
         song.id.clone(),
         backend::track::UsageType::Credits,
+        0,
+        60,
         user.id.clone(),
     );
     ctx.track_repo.save(&track).await.unwrap();
@@ -214,6 +222,8 @@ async fn test_repo_list_by_scene() {
             scene.id.clone(),
             song1.id.clone(),
             backend::track::UsageType::Background,
+            0,
+            60,
             user.id.clone(),
         ))
         .await
@@ -223,6 +233,8 @@ async fn test_repo_list_by_scene() {
             scene.id.clone(),
             song2.id.clone(),
             backend::track::UsageType::Featured,
+            0,
+            60,
             user.id.clone(),
         ))
         .await
@@ -251,6 +263,8 @@ async fn test_repo_list_by_song() {
             scene1.id.clone(),
             song.id.clone(),
             backend::track::UsageType::Background,
+            0,
+            60,
             user.id.clone(),
         ))
         .await
@@ -260,6 +274,8 @@ async fn test_repo_list_by_song() {
             scene2.id.clone(),
             song.id.clone(),
             backend::track::UsageType::Credits,
+            0,
+            60,
             user.id.clone(),
         ))
         .await
@@ -278,6 +294,8 @@ async fn test_repo_get_by_scene_and_song() {
         scene.id.clone(),
         song.id.clone(),
         backend::track::UsageType::Trailer,
+        0,
+        60,
         user.id.clone(),
     );
     ctx.track_repo.save(&track).await.unwrap();
@@ -496,6 +514,8 @@ async fn test_service_update_track() {
             &created.id,
             UpdateTrackRequest {
                 usage_type: Some("CREDITS".into()),
+                start_time_seconds: None,
+                end_time_seconds: None,
                 notes: Some("End credits music".into()),
             },
             &user.id,
@@ -516,6 +536,8 @@ async fn test_service_update_track_not_found() {
             &TrackId::new(),
             UpdateTrackRequest {
                 usage_type: Some("FEATURED".into()),
+                start_time_seconds: None,
+                end_time_seconds: None,
                 notes: None,
             },
             &actor,

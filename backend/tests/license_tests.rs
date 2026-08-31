@@ -99,6 +99,8 @@ impl TestContext {
             scene.id.clone(),
             song.id.clone(),
             UsageType::Background,
+            0,
+            60,
             owner.id.clone(),
         );
         self.track_repo.save(&track).await.unwrap();
@@ -136,6 +138,8 @@ impl TestContext {
             scene.id.clone(),
             song.id.clone(),
             UsageType::Background,
+            0,
+            60,
             owner.id.clone(),
         );
         self.track_repo.save(&track).await.unwrap();

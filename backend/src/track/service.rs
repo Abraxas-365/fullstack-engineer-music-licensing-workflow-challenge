@@ -76,10 +76,18 @@ impl TrackService {
 
         self.assert_movie_team(&req.scene_id, &created_by).await?;
 
-        self.song_repo
+        let song = self
+            .song_repo
             .get_by_id(&req.song_id)
             .await?
             .ok_or_else(|| AppError::not_found("Song not found"))?;
+
+        if req.end_time_seconds > song.duration_seconds {
+            return Err(
+                AppError::validation("End time cannot exceed the song's duration")
+                    .with_detail("field", "end_time_seconds"),
+            );
+        }
 
         // Check if song is already placed in this scene
         if self
@@ -91,7 +99,14 @@ impl TrackService {
             return Err(TrackError::already_exists());
         }
 
-        let mut track = Track::new(req.scene_id, req.song_id, usage_type, created_by);
+        let mut track = Track::new(
+            req.scene_id,
+            req.song_id,
+            usage_type,
+            req.start_time_seconds,
+            req.end_time_seconds,
+            created_by,
+        );
         track.notes = req.notes;
 
         self.track_repo.save(&track).await?;
@@ -134,6 +149,26 @@ impl TrackService {
 
         if let Some(usage_type) = new_usage {
             track.usage_type = usage_type;
+        }
+        if let Some(start) = req.start_time_seconds {
+            track.start_time_seconds = start;
+        }
+        if let Some(end) = req.end_time_seconds {
+            track.end_time_seconds = end;
+        }
+        if track.end_time_seconds <= track.start_time_seconds {
+            return Err(
+                AppError::validation("End time must be greater than start time")
+                    .with_detail("field", "end_time_seconds"),
+            );
+        }
+        if let Some(song) = self.song_repo.get_by_id(&track.song_id).await? {
+            if track.end_time_seconds > song.duration_seconds {
+                return Err(
+                    AppError::validation("End time cannot exceed the song's duration")
+                        .with_detail("field", "end_time_seconds"),
+                );
+            }
         }
         if let Some(notes) = req.notes {
             track.notes = Some(notes);
@@ -409,6 +444,8 @@ mod tests {
             scene_id,
             song_id,
             usage_type: "BACKGROUND".into(),
+            start_time_seconds: 0,
+            end_time_seconds: 60,
             notes: None,
         }
     }
@@ -487,6 +524,69 @@ mod tests {
         req.usage_type = "INVALID".into();
         let err = svc.create_track(req, owner_id).await.unwrap_err();
         assert_eq!(err.code, "VALIDATION_ERROR");
+    }
+
+    #[tokio::test]
+    async fn create_track_end_before_start() {
+        let (scene, movie_id) = make_scene();
+        let song = make_song();
+        let owner_id = UserId::new();
+        let svc = make_svc(
+            MockTrackRepo::new(),
+            MockSceneRepo::with_scene(scene.clone()),
+            MockSongRepo::with_song(song.clone()),
+            MockMovieRepo::with_owner(movie_id, owner_id.clone()),
+        );
+        let mut req = create_req(scene.id.clone(), song.id.clone());
+        req.start_time_seconds = 30;
+        req.end_time_seconds = 30;
+        let err = svc.create_track(req, owner_id).await.unwrap_err();
+        assert_eq!(err.code, "VALIDATION_ERROR");
+    }
+
+    #[tokio::test]
+    async fn create_track_end_exceeds_song_duration() {
+        let (scene, movie_id) = make_scene();
+        let song = make_song(); // duration_seconds = 240
+        let owner_id = UserId::new();
+        let svc = make_svc(
+            MockTrackRepo::new(),
+            MockSceneRepo::with_scene(scene.clone()),
+            MockSongRepo::with_song(song.clone()),
+            MockMovieRepo::with_owner(movie_id, owner_id.clone()),
+        );
+        let mut req = create_req(scene.id.clone(), song.id.clone());
+        req.end_time_seconds = 300;
+        let err = svc.create_track(req, owner_id).await.unwrap_err();
+        assert_eq!(err.code, "VALIDATION_ERROR");
+    }
+
+    #[tokio::test]
+    async fn create_track_range_must_fit_within_song_duration() {
+        let (scene, movie_id) = make_scene();
+        let song = Song::new("Short Song".into(), UserId::new(), None, 120);
+        let owner_id = UserId::new();
+        let svc = make_svc(
+            MockTrackRepo::new(),
+            MockSceneRepo::with_scene(scene.clone()),
+            MockSongRepo::with_song(song.clone()),
+            MockMovieRepo::with_owner(movie_id, owner_id.clone()),
+        );
+
+        // 100..150 does not fit within a 120s song -> rejected
+        let mut req = create_req(scene.id.clone(), song.id.clone());
+        req.start_time_seconds = 100;
+        req.end_time_seconds = 150;
+        let err = svc.create_track(req, owner_id.clone()).await.unwrap_err();
+        assert_eq!(err.code, "VALIDATION_ERROR");
+
+        // 100..120 fits exactly -> accepted
+        let mut req = create_req(scene.id.clone(), song.id.clone());
+        req.start_time_seconds = 100;
+        req.end_time_seconds = 120;
+        let track = svc.create_track(req, owner_id).await.unwrap();
+        assert_eq!(track.start_time_seconds, 100);
+        assert_eq!(track.end_time_seconds, 120);
     }
 
     #[tokio::test]
@@ -694,6 +794,8 @@ mod tests {
             .update_track(
                 &created.id,
                 UpdateTrackRequest {
+                    start_time_seconds: None,
+                    end_time_seconds: None,
                     usage_type: Some("FEATURED".into()),
                     notes: None,
                 },
@@ -702,6 +804,75 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(updated.usage_type, super::super::model::UsageType::Featured);
+    }
+
+    #[tokio::test]
+    async fn update_track_times() {
+        let (scene, movie_id) = make_scene();
+        let song = make_song(); // duration_seconds = 240
+        let owner_id = UserId::new();
+        let svc = make_svc(
+            MockTrackRepo::new(),
+            MockSceneRepo::with_scene(scene.clone()),
+            MockSongRepo::with_song(song.clone()),
+            MockMovieRepo::with_owner(movie_id, owner_id.clone()),
+        );
+        let created = svc
+            .create_track(
+                create_req(scene.id.clone(), song.id.clone()),
+                owner_id.clone(),
+            )
+            .await
+            .unwrap();
+        let updated = svc
+            .update_track(
+                &created.id,
+                UpdateTrackRequest {
+                    start_time_seconds: Some(10),
+                    end_time_seconds: Some(90),
+                    usage_type: None,
+                    notes: None,
+                },
+                &owner_id,
+            )
+            .await
+            .unwrap();
+        assert_eq!(updated.start_time_seconds, 10);
+        assert_eq!(updated.end_time_seconds, 90);
+    }
+
+    #[tokio::test]
+    async fn update_track_end_exceeds_song_duration() {
+        let (scene, movie_id) = make_scene();
+        let song = make_song(); // duration_seconds = 240
+        let owner_id = UserId::new();
+        let svc = make_svc(
+            MockTrackRepo::new(),
+            MockSceneRepo::with_scene(scene.clone()),
+            MockSongRepo::with_song(song.clone()),
+            MockMovieRepo::with_owner(movie_id, owner_id.clone()),
+        );
+        let created = svc
+            .create_track(
+                create_req(scene.id.clone(), song.id.clone()),
+                owner_id.clone(),
+            )
+            .await
+            .unwrap();
+        let err = svc
+            .update_track(
+                &created.id,
+                UpdateTrackRequest {
+                    start_time_seconds: None,
+                    end_time_seconds: Some(300),
+                    usage_type: None,
+                    notes: None,
+                },
+                &owner_id,
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(err.code, "VALIDATION_ERROR");
     }
 
     #[tokio::test]
@@ -726,6 +897,8 @@ mod tests {
             .update_track(
                 &created.id,
                 UpdateTrackRequest {
+                    start_time_seconds: None,
+                    end_time_seconds: None,
                     usage_type: None,
                     notes: Some("Loud during chase".into()),
                 },
@@ -753,6 +926,8 @@ mod tests {
             .update_track(
                 &TrackId::new(),
                 UpdateTrackRequest {
+                    start_time_seconds: None,
+                    end_time_seconds: None,
                     usage_type: Some("FEATURED".into()),
                     notes: None,
                 },
@@ -785,6 +960,8 @@ mod tests {
             .update_track(
                 &created.id,
                 UpdateTrackRequest {
+                    start_time_seconds: None,
+                    end_time_seconds: None,
                     usage_type: Some("NOPE".into()),
                     notes: None,
                 },
@@ -903,6 +1080,8 @@ mod tests {
             .update_track(
                 &created.id,
                 UpdateTrackRequest {
+                    start_time_seconds: None,
+                    end_time_seconds: None,
                     usage_type: Some("FEATURED".into()),
                     notes: None,
                 },
