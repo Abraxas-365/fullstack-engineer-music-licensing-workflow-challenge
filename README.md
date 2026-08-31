@@ -4,6 +4,24 @@ Full-stack application for managing music licensing negotiations between movie p
 
 Movie teams place songs into scenes, submit license requests, and negotiate terms (fee, territory, media rights, exclusivity) through a structured offer/counter-offer workflow. Rights holders review incoming requests and respond in real time via Server-Sent Events.
 
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Architecture](#architecture)
+  - [Backend — Hexagonal Architecture](#backend--hexagonal-architecture)
+  - [Frontend — Dual Workspace](#frontend--dual-workspace)
+- [Data Model](#data-model)
+- [Real-Time: Server-Sent Events](#real-time-server-sent-events)
+- [API](#api)
+- [Testing](#testing)
+- [Environment Variables](#environment-variables)
+- [Development (without Docker)](#development-without-docker)
+- [Project Structure](#project-structure)
+- [Deployment](#deployment)
+  - [Cloud Architecture (AWS)](#cloud-architecture-aws)
+  - [CI/CD](#cicd)
+- [Tech Decisions](#tech-decisions)
+
 ## Quick Start
 
 ```bash
