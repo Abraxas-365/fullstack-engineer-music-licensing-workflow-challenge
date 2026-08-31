@@ -379,6 +379,11 @@ pub async fn events(_auth: AuthContext, svc: web::Data<LicenseService>) -> HttpR
         .content_type("text/event-stream")
         .insert_header(("Cache-Control", "no-cache"))
         .insert_header(("Connection", "keep-alive"))
+        // Prevent the global Compress middleware from buffering this stream:
+        // gzip/brotli encoders hold data until their internal buffer fills,
+        // which defeats SSE's low-latency delivery. Browsers always send
+        // Accept-Encoding, so without this the stream never flushes live.
+        .insert_header(("Content-Encoding", "identity"))
         .streaming(stream)
 }
 
