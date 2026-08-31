@@ -14,11 +14,16 @@ import type {
 } from '@/types'
 
 function uuid(seed: string): string {
-  // Deterministic-looking fake UUIDs, stable across reloads for readability.
-  return seed.padEnd(36, '0').slice(0, 36).replace(
-    /^(.{8})(.{4})(.{4})(.{4})(.{12}).*$/,
-    '$1-$2-$3-$4-$5',
-  )
+  // Deterministic-looking fake UUIDs, stable across reloads. Hashed so the
+  // leading segment (used for short display ids like "License #a3f9c21e")
+  // is distinct per seed instead of just echoing a shared prefix.
+  let hash = 0
+  for (let i = 0; i < seed.length; i++) {
+    hash = (Math.imul(31, hash) + seed.charCodeAt(i)) | 0
+  }
+  const hex = Math.abs(hash).toString(16).padEnd(8, '0').slice(0, 8)
+  const body = `${hex}${seed}`.padEnd(32, '0').slice(0, 32)
+  return `${body.slice(0, 8)}-${body.slice(8, 12)}-${body.slice(12, 16)}-${body.slice(16, 20)}-${body.slice(20, 32)}`
 }
 
 export const USERS = {

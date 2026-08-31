@@ -2,8 +2,10 @@
 export { AppShell, AppHeader, AppSidebar } from './app-shell'
 export { PageHeader } from './page-header'
 export { EmptyState } from './empty-state'
+export { Breadcrumbs } from './breadcrumbs'
 export { ThemeProvider, useTheme } from './theme-provider'
 export { ApiModeToggle } from './api-mode-toggle'
+export { NotificationBell } from './notification-bell'
 
 // Domain
 export { StatusBadge } from './status-badge'
