@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { PageHeader } from '@/components/page-header'
 import { EmptyState } from '@/components/empty-state'
@@ -6,6 +6,7 @@ import { Breadcrumbs } from '@/components/breadcrumbs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Combobox, type ComboboxItem } from '@/components/ui/combobox'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { UsageBadge } from '@/components/role-badge'
 import { StatusBadge } from '@/components/status-badge'
@@ -31,6 +32,7 @@ import {
 import { api, getApiMode } from '@/api'
 import { useAsync } from '@/lib/use-async'
 import { cn, formatCurrency, formatTime } from '@/lib/utils'
+import { userName } from '@/lib/user-name'
 import { Music, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import type { LicenseOffer, LicenseRequest, Song, Track, UsageType } from '@/types'
@@ -314,6 +316,15 @@ function AddTrackDialog({ sceneId, onCreated }: { sceneId: string; onCreated: ()
     () => api.songs.find({ page_size: 100 }).then(p => p.items),
     [getApiMode()],
   )
+  const songItems: ComboboxItem[] = useMemo(() => {
+    if (!songs) return []
+    return songs.map(song => ({
+      value: song.id,
+      label: song.title,
+      description: [userName(song.artist_id), song.album, song.genre].filter(Boolean).join(' · '),
+    }))
+  }, [songs])
+
   const [songId, setSongId] = useState('')
   const [usageType, setUsageType] = useState<UsageType>('BACKGROUND')
   const [startTime, setStartTime] = useState('0')
@@ -322,6 +333,15 @@ function AddTrackDialog({ sceneId, onCreated }: { sceneId: string; onCreated: ()
   const [submitting, setSubmitting] = useState(false)
 
   const selectedSong = songs?.find(s => s.id === songId)
+
+  function handleSongChange(value: string) {
+    setSongId(value)
+    const song = songs?.find(s => s.id === value)
+    if (song) {
+      setStartTime('0')
+      setEndTime(String(song.duration_seconds))
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -356,7 +376,7 @@ function AddTrackDialog({ sceneId, onCreated }: { sceneId: string; onCreated: ()
   }
 
   return (
-    <DialogContent>
+    <DialogContent className="sm:max-w-lg">
       <form onSubmit={handleSubmit}>
         <DialogHeader>
           <DialogTitle>Add track</DialogTitle>
@@ -365,27 +385,15 @@ function AddTrackDialog({ sceneId, onCreated }: { sceneId: string; onCreated: ()
         <div className="space-y-4 py-4">
           <div className="space-y-1.5">
             <Label htmlFor="track-song">Song</Label>
-            <Select
+            <Combobox
+              items={songItems}
               value={songId}
-              onValueChange={v => {
-                setSongId(v ?? '')
-                const song = songs?.find(s => s.id === v)
-                if (song) {
-                  setStartTime('0')
-                  setEndTime(String(song.duration_seconds))
-                }
-              }}
+              onValueChange={handleSongChange}
+              placeholder={songsLoading ? 'Loading songs...' : 'Search for a song...'}
+              searchPlaceholder="Search by title, artist, album..."
+              emptyMessage="No songs found."
               disabled={songsLoading}
-            >
-              <SelectTrigger id="track-song" className="w-full">
-                <SelectValue placeholder={songsLoading ? 'Loading songs...' : 'Select a song'} />
-              </SelectTrigger>
-              <SelectContent>
-                {songs?.map(song => (
-                  <SelectItem key={song.id} value={song.id}>{song.title}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="track-usage">Usage type</Label>
