@@ -75,13 +75,22 @@ const licenses: LicensesApi = {
   cancel: id => post(`/licenses/${id}/cancel`),
   delete: id => del(`/licenses/${id}`),
   subscribeEvents(onEvent) {
-    // EventSource can't send an Authorization header, and the backend only
-    // reads the bearer token from that header (or a cookie), so we stream
-    // the SSE response manually via fetch instead.
-    const controller = new AbortController()
-    const token = getAccessToken()
+    let stopped = false
+    let controller: AbortController | null = null
 
-    void (async () => {
+    // Exponential backoff with full jitter: 1s initial, 2x growth, 30s max
+    let backoff = 1000
+    const BACKOFF_MAX = 30_000
+    const BACKOFF_INITIAL = 1000
+
+    function jitter(ms: number): number {
+      return Math.random() * ms
+    }
+
+    async function readStream() {
+      controller = new AbortController()
+      const token = getAccessToken()
+
       try {
         const url = new URL(getBaseUrl() + '/licenses/events', window.location.origin).toString()
         const res = await fetch(url, {
@@ -89,6 +98,10 @@ const licenses: LicensesApi = {
           signal: controller.signal,
         })
         if (!res.body) return
+
+        // Connected — reset backoff
+        backoff = BACKOFF_INITIAL
+
         const reader = res.body.getReader()
         const decoder = new TextDecoder()
         let buffer = ''
@@ -103,7 +116,7 @@ const licenses: LicensesApi = {
             const chunk = buffer.slice(0, sepIndex)
             buffer = buffer.slice(sepIndex + 2)
             const line = chunk.split('\n').find(l => l.startsWith('data: '))
-            if (!line) continue
+            if (!line) continue // keepalive comments or other non-data lines
             try {
               onEvent(JSON.parse(line.slice('data: '.length)) as LicenseEvent)
             } catch {
@@ -112,11 +125,40 @@ const licenses: LicensesApi = {
           }
         }
       } catch {
-        // stream closed / aborted
+        // stream closed, aborted, or network error
       }
-    })()
+    }
 
-    return () => controller.abort()
+    async function connectLoop() {
+      while (!stopped) {
+        await readStream()
+        if (stopped) break
+        // Wait with exponential backoff + jitter before reconnecting
+        const delay = jitter(backoff)
+        backoff = Math.min(backoff * 2, BACKOFF_MAX)
+        await new Promise(r => setTimeout(r, delay))
+      }
+    }
+
+    // Page Visibility: disconnect when hidden, reconnect when visible
+    function onVisibilityChange() {
+      if (document.hidden) {
+        // Tab went to background — abort the current stream to save resources
+        controller?.abort()
+      }
+      // When tab becomes visible again, connectLoop will reconnect
+      // (the aborted readStream returns, loop continues)
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    void connectLoop()
+
+    // Return unsubscribe function
+    return () => {
+      stopped = true
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      controller?.abort()
+    }
   },
 }
 
