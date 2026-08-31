@@ -1438,3 +1438,187 @@ async fn test_sse_endpoint_unauthenticated() {
     let resp = actix_test::call_service(&app, req).await;
     assert_eq!(resp.status(), 401);
 }
+
+#[actix_web::test]
+async fn test_sse_content_encoding_identity() {
+    let ctx = ApiTestContext::new().await;
+    let user = ctx.create_user().await;
+    let token = ctx.token_for(&user, ApiTestContext::all_license_scopes());
+
+    let app = actix_test::init_service(
+        App::new()
+            .app_data(ctx.license_svc.clone())
+            .app_data(Data::from(ctx.token_svc.clone() as Arc<dyn TokenService>))
+            .configure(backend::license::api::configure),
+    )
+    .await;
+
+    let req = actix_test::TestRequest::get()
+        .uri("/licenses/events")
+        .insert_header(("Authorization", format!("Bearer {token}")))
+        .to_request();
+    let resp = actix_test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+
+    let encoding = resp
+        .headers()
+        .get("content-encoding")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert_eq!(
+        encoding, "identity",
+        "SSE must bypass compression to avoid buffering"
+    );
+}
+
+#[actix_web::test]
+async fn test_sse_stream_event_format() {
+    use actix_web::body::MessageBody;
+    use backend::license::LicenseEventKind;
+    use std::pin::Pin;
+
+    let ctx = ApiTestContext::new().await;
+    let user = ctx.create_user().await;
+    let token = ctx.token_for(&user, ApiTestContext::all_license_scopes());
+
+    let app = actix_test::init_service(
+        App::new()
+            .app_data(ctx.license_svc.clone())
+            .app_data(Data::from(ctx.token_svc.clone() as Arc<dyn TokenService>))
+            .configure(backend::license::api::configure),
+    )
+    .await;
+
+    let req = actix_test::TestRequest::get()
+        .uri("/licenses/events")
+        .insert_header(("Authorization", format!("Bearer {token}")))
+        .to_request();
+    let resp = actix_test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+
+    // Send event after the handler has subscribed
+    let event = LicenseEvent {
+        license_id: backend::kernel::LicenseRequestId::new(),
+        track_id: backend::kernel::TrackId::new(),
+        kind: LicenseEventKind::Submitted,
+        actor: user.id.clone(),
+        actor_name: user.name.clone(),
+        timestamp: chrono::Utc::now(),
+    };
+    ctx.events_tx.send(event).unwrap();
+
+    let mut body = resp.into_body();
+    let chunk_fut = futures::future::poll_fn(|cx| Pin::new(&mut body).poll_next(cx));
+    let chunk = tokio::time::timeout(Duration::from_secs(2), chunk_fut)
+        .await
+        .expect("event should arrive within 2s");
+
+    if let Some(Ok(bytes)) = chunk {
+        let text = String::from_utf8(bytes.to_vec()).unwrap();
+        assert!(
+            text.starts_with("data: "),
+            "SSE frame must start with 'data: '"
+        );
+        assert!(text.contains("\"kind\":\"submitted\""));
+        assert!(text.contains(&format!("\"actor_name\":\"{}\"", user.name)));
+        assert!(
+            text.ends_with("\n\n"),
+            "SSE frame must end with double newline"
+        );
+    } else {
+        panic!("expected an event chunk from the SSE stream");
+    }
+}
+
+#[actix_web::test]
+#[ignore] // Takes ~30s to wait for heartbeat; run with: cargo test -- --ignored
+async fn test_sse_heartbeat_arrives() {
+    use actix_web::body::MessageBody;
+    use std::pin::Pin;
+
+    let ctx = ApiTestContext::new().await;
+    let user = ctx.create_user().await;
+    let token = ctx.token_for(&user, ApiTestContext::all_license_scopes());
+
+    let app = actix_test::init_service(
+        App::new()
+            .app_data(ctx.license_svc.clone())
+            .app_data(Data::from(ctx.token_svc.clone() as Arc<dyn TokenService>))
+            .configure(backend::license::api::configure),
+    )
+    .await;
+
+    let req = actix_test::TestRequest::get()
+        .uri("/licenses/events")
+        .insert_header(("Authorization", format!("Bearer {token}")))
+        .to_request();
+    let resp = actix_test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+
+    let mut body = resp.into_body();
+    let chunk_fut = futures::future::poll_fn(|cx| Pin::new(&mut body).poll_next(cx));
+    let chunk = tokio::time::timeout(Duration::from_secs(35), chunk_fut)
+        .await
+        .expect("heartbeat should arrive within 35s");
+
+    if let Some(Ok(bytes)) = chunk {
+        let text = String::from_utf8(bytes.to_vec()).unwrap();
+        assert_eq!(text, ": keepalive\n\n");
+    } else {
+        panic!("expected a heartbeat chunk from the SSE stream");
+    }
+}
+
+#[actix_web::test]
+async fn test_sse_event_before_heartbeat() {
+    use actix_web::body::MessageBody;
+    use backend::license::LicenseEventKind;
+    use std::pin::Pin;
+
+    let ctx = ApiTestContext::new().await;
+    let user = ctx.create_user().await;
+    let token = ctx.token_for(&user, ApiTestContext::all_license_scopes());
+
+    let app = actix_test::init_service(
+        App::new()
+            .app_data(ctx.license_svc.clone())
+            .app_data(Data::from(ctx.token_svc.clone() as Arc<dyn TokenService>))
+            .configure(backend::license::api::configure),
+    )
+    .await;
+
+    let req = actix_test::TestRequest::get()
+        .uri("/licenses/events")
+        .insert_header(("Authorization", format!("Bearer {token}")))
+        .to_request();
+    let resp = actix_test::call_service(&app, req).await;
+
+    // Send an event — should arrive before the 30s heartbeat
+    let event = LicenseEvent {
+        license_id: backend::kernel::LicenseRequestId::new(),
+        track_id: backend::kernel::TrackId::new(),
+        kind: LicenseEventKind::Accepted,
+        actor: user.id.clone(),
+        actor_name: user.name.clone(),
+        timestamp: chrono::Utc::now(),
+    };
+    ctx.events_tx.send(event).unwrap();
+
+    let mut body = resp.into_body();
+    let chunk_fut = futures::future::poll_fn(|cx| Pin::new(&mut body).poll_next(cx));
+    let chunk = tokio::time::timeout(Duration::from_secs(2), chunk_fut)
+        .await
+        .expect("event should arrive within 2s");
+
+    if let Some(Ok(bytes)) = chunk {
+        let text = String::from_utf8(bytes.to_vec()).unwrap();
+        assert!(
+            text.starts_with("data: "),
+            "should be a data frame, not a keepalive"
+        );
+        assert!(text.contains("\"kind\":\"accepted\""));
+    } else {
+        panic!("expected an event chunk from the SSE stream");
+    }
+}

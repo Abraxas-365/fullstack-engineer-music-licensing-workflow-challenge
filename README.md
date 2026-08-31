@@ -283,7 +283,7 @@ Or use the Makefile shortcuts: `make backend-run`, `make frontend-dev`.
 **Key design choices:**
 
 - **Frontend** is pure static files (S3 + CloudFront) — no container needed, global CDN caching, SPA fallback via custom error responses (403/404 → `index.html`)
-- **API calls go directly to the ALB**, not through CloudFront — avoids CDN caching issues with authenticated/dynamic responses and keeps SSE connections clean (ALB idle timeout is set to 300s for long-lived SSE streams)
+- **API calls go directly to the ALB**, not through CloudFront — avoids CDN caching issues with authenticated/dynamic responses and keeps SSE connections clean (ALB idle timeout is set to 300s for long-lived SSE streams; the backend sends a `: keepalive` comment every 30s to prevent idle disconnects)
 - **Cross-origin**: frontend on `app.example.com`, backend on `api.example.com` — `CORS_ORIGIN` is set to the CloudFront domain, and `VITE_API_URL` is set at frontend build time to point at the ALB
 - **RDS + ECS in private subnets** — only the ALB is internet-facing; backend reaches the internet via a NAT gateway (for ECR image pulls, etc.)
 - **Secrets**: DB credentials stored in AWS Secrets Manager, injected into ECS task definition as environment variables

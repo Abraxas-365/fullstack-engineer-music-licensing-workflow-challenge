@@ -369,6 +369,7 @@ dependencies = [
  "bcrypt",
  "chrono",
  "env_logger",
+ "futures",
  "jsonwebtoken",
  "log",
  "serde",
