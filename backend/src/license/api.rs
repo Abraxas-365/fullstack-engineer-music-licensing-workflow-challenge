@@ -1,8 +1,6 @@
 use actix_web::{HttpResponse, web};
 use serde::Deserialize;
 use tokio::sync::broadcast;
-use tokio_stream::StreamExt;
-use tokio_stream::wrappers::BroadcastStream;
 use utoipa::ToSchema;
 
 use crate::error::AppError;
@@ -377,16 +375,40 @@ pub async fn delete_license(
     )
 )]
 pub async fn events(_auth: AuthContext, svc: web::Data<LicenseService>) -> HttpResponse {
-    let rx: broadcast::Receiver<LicenseEvent> = svc.subscribe();
-    let stream = BroadcastStream::new(rx).filter_map(|result| match result {
-        Ok(event) => {
-            let json = serde_json::to_string(&event).ok()?;
-            Some(Ok::<_, actix_web::Error>(web::Bytes::from(format!(
-                "data: {json}\n\n"
-            ))))
+    let mut rx: broadcast::Receiver<LicenseEvent> = svc.subscribe();
+
+    let stream = async_stream::stream! {
+        let mut heartbeat = tokio::time::interval(std::time::Duration::from_secs(30));
+        // First tick fires immediately — skip it so the client doesn't get
+        // a keepalive before any real data.
+        heartbeat.tick().await;
+
+        loop {
+            tokio::select! {
+                result = rx.recv() => {
+                    match result {
+                        Ok(event) => {
+                            if let Ok(json) = serde_json::to_string(&event) {
+                                yield Ok::<_, actix_web::Error>(
+                                    web::Bytes::from(format!("data: {json}\n\n"))
+                                );
+                            }
+                        }
+                        Err(broadcast::error::RecvError::Lagged(n)) => {
+                            log::warn!("SSE receiver lagged, dropped {n} messages");
+                            // Continue — next recv() returns the oldest retained message
+                        }
+                        Err(broadcast::error::RecvError::Closed) => break,
+                    }
+                }
+                _ = heartbeat.tick() => {
+                    yield Ok::<_, actix_web::Error>(
+                        web::Bytes::from(": keepalive\n\n")
+                    );
+                }
+            }
         }
-        Err(_) => None,
-    });
+    };
 
     HttpResponse::Ok()
         .content_type("text/event-stream")
