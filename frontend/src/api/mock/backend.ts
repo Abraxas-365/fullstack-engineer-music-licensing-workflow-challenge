@@ -65,7 +65,9 @@ function business(message: string): never {
 }
 
 function genId(prefix: string): string {
-  return `${prefix}-${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`
+  // Random segment first so short display ids (e.g. slice(0, 8)) are
+  // distinct per record instead of all sharing the same prefix.
+  return `${Math.random().toString(36).slice(2, 10)}-${prefix}-${Date.now().toString(36)}`
 }
 
 function paginate<T>(items: T[], page = 1, pageSize = 20) {
