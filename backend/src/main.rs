@@ -162,4 +162,10 @@ async fn run_migrations(pool: &sqlx::PgPool) {
         .execute(pool)
         .await
         .expect("Failed to run migration 002");
+
+    log::info!("Running migration 003_seed_users (idempotent)");
+    sqlx::raw_sql(include_str!("../migrations/003_seed_users.up.sql"))
+        .execute(pool)
+        .await
+        .expect("Failed to run migration 003");
 }
