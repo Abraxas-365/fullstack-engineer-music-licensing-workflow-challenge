@@ -61,6 +61,22 @@ impl LabelRepository for PostgresLabelRepository {
         row.as_ref().map(label_from_row).transpose()
     }
 
+    async fn get_by_ids(&self, ids: &[LabelId]) -> Result<Vec<Label>, AppError> {
+        if ids.is_empty() {
+            return Ok(vec![]);
+        }
+        let id_strs: Vec<&str> = ids.iter().map(LabelId::as_str).collect();
+        let rows = sqlx::query(
+            "SELECT id, name, website, contact_email, created_at, updated_at FROM labels WHERE id = ANY($1)",
+        )
+        .bind(&id_strs)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::internal(format!("Database error: {e}")))?;
+
+        rows.iter().map(label_from_row).collect()
+    }
+
     async fn list_all(&self) -> Result<Vec<Label>, AppError> {
         let rows = sqlx::query(
             "SELECT id, name, website, contact_email, created_at, updated_at FROM labels ORDER BY name",

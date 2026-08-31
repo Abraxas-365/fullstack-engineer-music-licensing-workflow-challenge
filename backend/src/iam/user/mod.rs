@@ -9,5 +9,5 @@ pub use model::{
     CreateUserRequest, OAuthProvider, SuspendUserRequest, UpdateUserRequest, User, UserDetailsDTO,
     UserFilter, UserResponse, UserStatus,
 };
-pub use port::{PasswordService, UserRepository};
+pub use port::{PasswordService, UserRepository, UserRepositoryExt};
 pub use service::UserService;

@@ -159,6 +159,16 @@ mod tests {
                 .find(|u| u.id == *id)
                 .cloned())
         }
+        async fn get_by_ids(&self, ids: &[UserId]) -> Result<Vec<User>, AppError> {
+            Ok(self
+                .users
+                .lock()
+                .await
+                .iter()
+                .filter(|u| ids.contains(&u.id))
+                .cloned()
+                .collect())
+        }
         async fn get_by_email(&self, email: &str) -> Result<Option<User>, AppError> {
             Ok(self
                 .users

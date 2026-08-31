@@ -11,5 +11,5 @@ pub use model::{
     AddMemberRequest, CreateLabelRequest, Label, LabelMember, LabelMemberResponse, LabelResponse,
     LabelRole, UpdateLabelRequest,
 };
-pub use port::LabelRepository;
+pub use port::{LabelRepository, LabelRepositoryExt};
 pub use service::LabelService;

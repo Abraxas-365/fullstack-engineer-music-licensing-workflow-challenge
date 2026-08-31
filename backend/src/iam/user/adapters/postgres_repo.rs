@@ -29,6 +29,22 @@ impl UserRepository for PostgresUserRepository {
         row.as_ref().map(user_from_row).transpose()
     }
 
+    async fn get_by_ids(&self, ids: &[UserId]) -> Result<Vec<User>, AppError> {
+        if ids.is_empty() {
+            return Ok(vec![]);
+        }
+        let id_strs: Vec<&str> = ids.iter().map(UserId::as_str).collect();
+        let rows = sqlx::query(&format!(
+            "SELECT {USER_COLUMNS} FROM users WHERE id = ANY($1)"
+        ))
+        .bind(&id_strs)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::internal(format!("Database error: {e}")))?;
+
+        rows.iter().map(user_from_row).collect()
+    }
+
     async fn get_by_email(&self, email: &str) -> Result<Option<User>, AppError> {
         let row = sqlx::query(&format!(
             "SELECT {USER_COLUMNS} FROM users WHERE email = $1"
