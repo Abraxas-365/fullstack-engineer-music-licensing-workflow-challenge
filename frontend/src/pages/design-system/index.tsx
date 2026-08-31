@@ -39,6 +39,7 @@ const MOCK_MOVIE: Movie = {
   release_year: 2026,
   director: 'Jane Doe',
   created_by: '00000000-0000-0000-0000-000000000001',
+  created_by_name: 'Jordan Blake',
   created_at: '2026-08-30T12:00:00Z',
   updated_at: '2026-08-30T12:00:00Z',
 }
@@ -47,7 +48,9 @@ const MOCK_SONG: Song = {
   id: 'b1b2c3d4-0000-0000-0000-000000000001',
   title: 'Neon Lights',
   artist_id: '00000000-0000-0000-0000-000000000003',
+  artist_name: 'Nova Chen',
   label_id: 'c1b2c3d4-0000-0000-0000-000000000001',
+  label_name: 'Wave Records',
   album: 'Electric Dreams',
   duration_seconds: 240,
   genre: 'Electronic',
@@ -61,8 +64,10 @@ const MOCK_LICENSE: LicenseRequest = {
   track_id: 'e1b2c3d4-0000-0000-0000-000000000001',
   status: 'APPROVED',
   requested_by: '00000000-0000-0000-0000-000000000002',
+  requested_by_name: 'Casey Reyes',
   requested_at: '2026-08-25T14:00:00Z',
   resolved_by: '00000000-0000-0000-0000-000000000004',
+  resolved_by_name: 'Priya Anand',
   resolved_at: '2026-08-28T16:30:00Z',
   rejection_reason: null,
   created_at: '2026-08-25T14:00:00Z',
@@ -70,10 +75,10 @@ const MOCK_LICENSE: LicenseRequest = {
 }
 
 const MOCK_OFFERS: (LicenseOffer & { proposer_name: string })[] = [
-  { id: '1', license_request_id: MOCK_LICENSE.id, offer_number: 1, side: 'MOVIE_TEAM', proposed_by: '2', proposer_name: 'Producer', license_fee: 5000, currency: 'USD', territory: 'Worldwide', media_rights: null, license_start: null, license_end: null, exclusive: false, notes: 'Initial offer for opening scene placement', created_at: '2026-08-25T14:00:00Z' },
-  { id: '2', license_request_id: MOCK_LICENSE.id, offer_number: 2, side: 'MOVIE_TEAM', proposed_by: '2', proposer_name: 'Producer', license_fee: 4500, currency: 'USD', territory: 'North America', media_rights: null, license_start: null, license_end: null, exclusive: false, notes: 'Revised — narrowed territory', created_at: '2026-08-26T09:00:00Z' },
-  { id: '3', license_request_id: MOCK_LICENSE.id, offer_number: 3, side: 'RIGHTS_HOLDER', proposed_by: '4', proposer_name: 'Label Manager', license_fee: 8000, currency: 'USD', territory: 'Worldwide', media_rights: null, license_start: null, license_end: null, exclusive: true, notes: 'Counter: higher fee for exclusive', created_at: '2026-08-26T15:00:00Z' },
-  { id: '4', license_request_id: MOCK_LICENSE.id, offer_number: 4, side: 'MOVIE_TEAM', proposed_by: '2', proposer_name: 'Producer', license_fee: 6000, currency: 'USD', territory: 'North America', media_rights: null, license_start: null, license_end: null, exclusive: false, notes: 'Final compromise', created_at: '2026-08-27T11:00:00Z' },
+  { id: '1', license_request_id: MOCK_LICENSE.id, offer_number: 1, side: 'MOVIE_TEAM', proposed_by: '2', proposed_by_name: 'Producer', proposer_name: 'Producer', license_fee: 5000, currency: 'USD', territory: 'Worldwide', media_rights: null, license_start: null, license_end: null, exclusive: false, notes: 'Initial offer for opening scene placement', created_at: '2026-08-25T14:00:00Z' },
+  { id: '2', license_request_id: MOCK_LICENSE.id, offer_number: 2, side: 'MOVIE_TEAM', proposed_by: '2', proposed_by_name: 'Producer', proposer_name: 'Producer', license_fee: 4500, currency: 'USD', territory: 'North America', media_rights: null, license_start: null, license_end: null, exclusive: false, notes: 'Revised — narrowed territory', created_at: '2026-08-26T09:00:00Z' },
+  { id: '3', license_request_id: MOCK_LICENSE.id, offer_number: 3, side: 'RIGHTS_HOLDER', proposed_by: '4', proposed_by_name: 'Label Manager', proposer_name: 'Label Manager', license_fee: 8000, currency: 'USD', territory: 'Worldwide', media_rights: null, license_start: null, license_end: null, exclusive: true, notes: 'Counter: higher fee for exclusive', created_at: '2026-08-26T15:00:00Z' },
+  { id: '4', license_request_id: MOCK_LICENSE.id, offer_number: 4, side: 'MOVIE_TEAM', proposed_by: '2', proposed_by_name: 'Producer', proposer_name: 'Producer', license_fee: 6000, currency: 'USD', territory: 'North America', media_rights: null, license_start: null, license_end: null, exclusive: false, notes: 'Final compromise', created_at: '2026-08-27T11:00:00Z' },
 ]
 
 /* ─── Section helper ─── */

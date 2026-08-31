@@ -100,6 +100,7 @@ const moviesApi: MoviesApi = {
       release_year: body.release_year ?? null,
       director: body.director ?? null,
       created_by: USERS.producer.id,
+      created_by_name: USERS.producer.name,
       created_at: nowIso(),
       updated_at: nowIso(),
     }
@@ -150,6 +151,7 @@ const moviesApi: MoviesApi = {
     const member = {
       movie_id: id,
       user_id: body.user_id,
+      user_name: USER_NAMES[body.user_id] ?? null,
       role: body.role ?? 'VIEWER',
       joined_at: nowIso(),
     } as MovieMember & { movie_id: string }
@@ -238,7 +240,9 @@ const songsApi: SongsApi = {
       id: genId('song'),
       title: body.title,
       artist_id: body.artist_id,
+      artist_name: USER_NAMES[body.artist_id] ?? null,
       label_id: body.label_id ?? null,
+      label_name: body.label_id ? (labels.find(l => l.id === body.label_id)?.name ?? null) : null,
       album: body.album ?? null,
       duration_seconds: body.duration_seconds,
       genre: body.genre ?? null,
@@ -310,6 +314,7 @@ const tracksApi: TracksApi = {
       end_time_seconds: body.end_time_seconds,
       duration_seconds: body.end_time_seconds - body.start_time_seconds,
       created_by: USERS.supervisor.id,
+      created_by_name: USERS.supervisor.name,
       notes: body.notes ?? null,
       created_at: nowIso(),
       updated_at: nowIso(),
@@ -391,6 +396,7 @@ const labelsApi: LabelsApi = {
     const member = {
       label_id: id,
       user_id: body.user_id,
+      user_name: USER_NAMES[body.user_id] ?? null,
       role: body.role ?? 'ARTIST',
       joined_at: nowIso(),
     } as LabelMember & { label_id: string }
@@ -444,8 +450,10 @@ const licensesApi: LicensesApi = {
       track_id: body.track_id,
       status: 'DRAFT',
       requested_by: USERS.supervisor.id,
+      requested_by_name: USERS.supervisor.name,
       requested_at: nowIso(),
       resolved_by: null,
+      resolved_by_name: null,
       resolved_at: null,
       rejection_reason: null,
       created_at: nowIso(),
@@ -457,6 +465,7 @@ const licensesApi: LicensesApi = {
       offer_number: 1,
       side: 'MOVIE_TEAM',
       proposed_by: USERS.supervisor.id,
+      proposed_by_name: USERS.supervisor.name,
       license_fee: body.license_fee ?? null,
       currency: body.currency ?? null,
       territory: body.territory ?? null,
@@ -528,6 +537,7 @@ const licensesApi: LicensesApi = {
       offer_number: last.offer_number + 1,
       side,
       proposed_by: proposedBy,
+      proposed_by_name: USER_NAMES[proposedBy] ?? null,
       license_fee: body.license_fee ?? null,
       currency: body.currency ?? last.currency,
       territory: body.territory ?? last.territory,
@@ -554,6 +564,7 @@ const licensesApi: LicensesApi = {
     if (license.status !== 'REQUESTED') business('License request cannot be accepted in its current state')
     license.status = 'APPROVED'
     license.resolved_by = getMockActorId() ?? USERS.labelManager.id
+    license.resolved_by_name = USER_NAMES[license.resolved_by] ?? null
     license.resolved_at = nowIso()
     license.updated_at = nowIso()
     emitLicenseEvent({
@@ -570,6 +581,7 @@ const licensesApi: LicensesApi = {
     if (license.status !== 'REQUESTED') business('License request cannot be rejected in its current state')
     license.status = 'REJECTED'
     license.resolved_by = getMockActorId() ?? USERS.labelManager.id
+    license.resolved_by_name = USER_NAMES[license.resolved_by] ?? null
     license.resolved_at = nowIso()
     license.rejection_reason = reason
     license.updated_at = nowIso()
