@@ -34,7 +34,8 @@ pub async fn create_track(
 ) -> Result<HttpResponse, AppError> {
     auth.require_scope(scopes::SCOPE_TRACKS_WRITE)?;
     let track = svc.create_track(body.into_inner(), auth.user_id).await?;
-    Ok(HttpResponse::Created().json(TrackResponse::from(track)))
+    let res = TrackResponse::from(&svc.to_detail(track).await?);
+    Ok(HttpResponse::Created().json(res))
 }
 
 /// Get a track
@@ -59,7 +60,8 @@ pub async fn get_track(
     let track = svc
         .get_track(&TrackId::from_string(path.into_inner()))
         .await?;
-    Ok(HttpResponse::Ok().json(TrackResponse::from(track)))
+    let res = TrackResponse::from(&svc.to_detail(track).await?);
+    Ok(HttpResponse::Ok().json(res))
 }
 
 /// Update a track
@@ -91,7 +93,8 @@ pub async fn update_track(
             &auth.user_id,
         )
         .await?;
-    Ok(HttpResponse::Ok().json(TrackResponse::from(track)))
+    let res = TrackResponse::from(&svc.to_detail(track).await?);
+    Ok(HttpResponse::Ok().json(res))
 }
 
 /// Delete a track
@@ -141,7 +144,10 @@ pub async fn get_track_license(
         .get_by_track(&TrackId::from_string(path.into_inner()))
         .await?;
     match license {
-        Some(l) => Ok(HttpResponse::Ok().json(LicenseRequestResponse::from(l))),
+        Some(l) => {
+            let res = LicenseRequestResponse::from(&svc.to_detail(l).await?);
+            Ok(HttpResponse::Ok().json(res))
+        }
         None => Ok(HttpResponse::Ok().json(serde_json::Value::Null)),
     }
 }

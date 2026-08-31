@@ -140,7 +140,12 @@ pub async fn list_scene_tracks(
     let tracks = svc
         .list_by_scene(&SceneId::from_string(path.into_inner()))
         .await?;
-    let res: Vec<TrackResponse> = tracks.into_iter().map(TrackResponse::from).collect();
+    let res: Vec<TrackResponse> = svc
+        .to_details(&tracks)
+        .await?
+        .iter()
+        .map(TrackResponse::from)
+        .collect();
     Ok(HttpResponse::Ok().json(res))
 }
 

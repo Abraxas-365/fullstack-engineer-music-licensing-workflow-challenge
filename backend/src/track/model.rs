@@ -152,6 +152,7 @@ pub struct TrackResponse {
     pub end_time_seconds: i32,
     pub duration_seconds: i32,
     pub created_by: UserId,
+    pub created_by_name: Option<String>,
     pub notes: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -169,9 +170,26 @@ impl From<Track> for TrackResponse {
             end_time_seconds: t.end_time_seconds,
             duration_seconds,
             created_by: t.created_by,
+            created_by_name: None,
             notes: t.notes,
             created_at: t.created_at,
             updated_at: t.updated_at,
         }
+    }
+}
+
+/// A [`Track`] enriched with the creator's name, resolved by the service
+/// layer via a batch lookup.
+#[derive(Debug, Clone)]
+pub struct TrackWithDetails {
+    pub track: Track,
+    pub created_by_name: Option<String>,
+}
+
+impl From<&TrackWithDetails> for TrackResponse {
+    fn from(d: &TrackWithDetails) -> Self {
+        let mut res = TrackResponse::from(d.track.clone());
+        res.created_by_name = d.created_by_name.clone();
+        res
     }
 }

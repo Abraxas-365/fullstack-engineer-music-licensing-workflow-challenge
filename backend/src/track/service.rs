@@ -3,13 +3,14 @@ use std::sync::Arc;
 use chrono::Utc;
 
 use crate::error::AppError;
+use crate::iam::user::{UserRepository, UserRepositoryExt};
 use crate::kernel::{TrackId, UserId};
 use crate::movie::{MovieRepository, MovieRole};
 use crate::scene::SceneRepository;
 use crate::song::SongRepository;
 
 use super::error::TrackError;
-use super::model::{CreateTrackRequest, Track, UpdateTrackRequest};
+use super::model::{CreateTrackRequest, Track, TrackWithDetails, UpdateTrackRequest};
 use super::port::TrackRepository;
 
 pub struct TrackService {
@@ -17,6 +18,7 @@ pub struct TrackService {
     scene_repo: Arc<dyn SceneRepository>,
     song_repo: Arc<dyn SongRepository>,
     movie_repo: Arc<dyn MovieRepository>,
+    user_repo: Arc<dyn UserRepository>,
 }
 
 impl TrackService {
@@ -25,12 +27,14 @@ impl TrackService {
         scene_repo: Arc<dyn SceneRepository>,
         song_repo: Arc<dyn SongRepository>,
         movie_repo: Arc<dyn MovieRepository>,
+        user_repo: Arc<dyn UserRepository>,
     ) -> Self {
         Self {
             track_repo,
             scene_repo,
             song_repo,
             movie_repo,
+            user_repo,
         }
     }
 
@@ -183,6 +187,35 @@ impl TrackService {
         let track = self.get_track(id).await?;
         self.assert_movie_team(&track.scene_id, actor).await?;
         self.track_repo.delete(id).await
+    }
+
+    // ========================================================================
+    // Response enrichment
+    // ========================================================================
+
+    pub async fn to_details(&self, tracks: &[Track]) -> Result<Vec<TrackWithDetails>, AppError> {
+        let names = self
+            .user_repo
+            .resolve_names(tracks.iter().map(|t| t.created_by.clone()))
+            .await?;
+        Ok(tracks
+            .iter()
+            .cloned()
+            .map(|t| {
+                let created_by_name = names.get(&t.created_by).cloned();
+                TrackWithDetails {
+                    track: t,
+                    created_by_name,
+                }
+            })
+            .collect())
+    }
+
+    pub async fn to_detail(&self, track: Track) -> Result<TrackWithDetails, AppError> {
+        Ok(self
+            .to_details(std::slice::from_ref(&track))
+            .await?
+            .remove(0))
     }
 }
 
@@ -415,6 +448,36 @@ mod tests {
         }
     }
 
+    struct MockUserRepo;
+    #[async_trait::async_trait]
+    impl UserRepository for MockUserRepo {
+        async fn get_by_id(&self, _: &UserId) -> Result<Option<crate::iam::user::User>, AppError> {
+            Ok(None)
+        }
+        async fn get_by_ids(&self, _: &[UserId]) -> Result<Vec<crate::iam::user::User>, AppError> {
+            Ok(vec![])
+        }
+        async fn get_by_email(&self, _: &str) -> Result<Option<crate::iam::user::User>, AppError> {
+            Ok(None)
+        }
+        async fn find(
+            &self,
+            _: &PaginationOptions,
+            _: &crate::iam::user::UserFilter,
+        ) -> Result<Paginated<crate::iam::user::User>, AppError> {
+            Ok(Paginated::new(vec![], 1, 10, 0))
+        }
+        async fn save(&self, _: &crate::iam::user::User) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn update(&self, _: &crate::iam::user::User) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn delete(&self, _: &UserId) -> Result<(), AppError> {
+            Ok(())
+        }
+    }
+
     fn make_scene() -> (Scene, MovieId) {
         let movie_id = MovieId::new();
         let scene = Scene::new(movie_id.clone(), "Opening".into(), 1, 0, 120);
@@ -436,6 +499,7 @@ mod tests {
             Arc::new(scene_repo),
             Arc::new(song_repo),
             Arc::new(movie_repo),
+            Arc::new(MockUserRepo),
         )
     }
 
