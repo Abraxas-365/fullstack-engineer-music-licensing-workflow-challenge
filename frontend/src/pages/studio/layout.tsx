@@ -31,6 +31,7 @@ export function StudioLayout() {
       activeHref={activeHref}
       userName={CURRENT_USER.name}
       userRole="Producer"
+      activePersona="studio"
     >
       <Outlet />
     </AppLayout>
