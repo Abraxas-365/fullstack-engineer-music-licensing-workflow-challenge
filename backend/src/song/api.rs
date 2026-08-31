@@ -64,7 +64,8 @@ pub async fn create_song(
 ) -> Result<HttpResponse, AppError> {
     auth.require_scope(scopes::SCOPE_SONGS_WRITE)?;
     let song = svc.create_song(body.into_inner()).await?;
-    Ok(HttpResponse::Created().json(SongResponse::from(&song)))
+    let res = SongResponse::from(&svc.to_detail(&song).await?);
+    Ok(HttpResponse::Created().json(res))
 }
 
 /// List / search songs
@@ -97,7 +98,12 @@ pub async fn find_songs(
         genre: q.genre,
     };
     let paginated = svc.find_songs(&opts, &filter).await?;
-    let items: Vec<SongResponse> = paginated.items.iter().map(SongResponse::from).collect();
+    let items: Vec<SongResponse> = svc
+        .to_details(&paginated.items)
+        .await?
+        .iter()
+        .map(SongResponse::from)
+        .collect();
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "items": items,
         "pagination": paginated.pagination,
@@ -126,7 +132,8 @@ pub async fn get_song(
     let song = svc
         .get_song(&SongId::from_string(path.into_inner()))
         .await?;
-    Ok(HttpResponse::Ok().json(SongResponse::from(&song)))
+    let res = SongResponse::from(&svc.to_detail(&song).await?);
+    Ok(HttpResponse::Ok().json(res))
 }
 
 /// Update a song
@@ -154,7 +161,8 @@ pub async fn update_song(
     let song = svc
         .update_song(&SongId::from_string(path.into_inner()), body.into_inner())
         .await?;
-    Ok(HttpResponse::Ok().json(SongResponse::from(&song)))
+    let res = SongResponse::from(&svc.to_detail(&song).await?);
+    Ok(HttpResponse::Ok().json(res))
 }
 
 /// Delete a song
@@ -202,7 +210,12 @@ pub async fn list_by_artist(
     let songs = svc
         .list_by_artist(&UserId::from_string(path.into_inner()))
         .await?;
-    let res: Vec<SongResponse> = songs.iter().map(SongResponse::from).collect();
+    let res: Vec<SongResponse> = svc
+        .to_details(&songs)
+        .await?
+        .iter()
+        .map(SongResponse::from)
+        .collect();
     Ok(HttpResponse::Ok().json(res))
 }
 
@@ -228,7 +241,12 @@ pub async fn list_song_tracks(
     let tracks = svc
         .list_by_song(&SongId::from_string(path.into_inner()))
         .await?;
-    let res: Vec<TrackResponse> = tracks.into_iter().map(TrackResponse::from).collect();
+    let res: Vec<TrackResponse> = svc
+        .to_details(&tracks)
+        .await?
+        .iter()
+        .map(TrackResponse::from)
+        .collect();
     Ok(HttpResponse::Ok().json(res))
 }
 

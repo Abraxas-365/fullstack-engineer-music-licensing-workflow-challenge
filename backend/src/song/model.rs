@@ -115,7 +115,9 @@ pub struct SongResponse {
     pub id: SongId,
     pub title: String,
     pub artist_id: UserId,
+    pub artist_name: Option<String>,
     pub label_id: Option<LabelId>,
+    pub label_name: Option<String>,
     pub album: Option<String>,
     pub duration_seconds: i32,
     pub genre: Option<String>,
@@ -130,7 +132,9 @@ impl From<&Song> for SongResponse {
             id: s.id.clone(),
             title: s.title.clone(),
             artist_id: s.artist_id.clone(),
+            artist_name: None,
             label_id: s.label_id.clone(),
+            label_name: None,
             album: s.album.clone(),
             duration_seconds: s.duration_seconds,
             genre: s.genre.clone(),
@@ -138,6 +142,25 @@ impl From<&Song> for SongResponse {
             created_at: s.created_at,
             updated_at: s.updated_at,
         }
+    }
+}
+
+/// A [`Song`] enriched with names resolved from other aggregates (artist,
+/// label). Built by the service layer via a batch lookup; kept separate from
+/// `Song` so the domain model stays free of cross-aggregate concerns.
+#[derive(Debug, Clone)]
+pub struct SongWithDetails {
+    pub song: Song,
+    pub artist_name: Option<String>,
+    pub label_name: Option<String>,
+}
+
+impl From<&SongWithDetails> for SongResponse {
+    fn from(d: &SongWithDetails) -> Self {
+        let mut res = SongResponse::from(&d.song);
+        res.artist_name = d.artist_name.clone();
+        res.label_name = d.label_name.clone();
+        res
     }
 }
 

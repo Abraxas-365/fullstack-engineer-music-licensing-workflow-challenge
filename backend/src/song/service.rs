@@ -3,12 +3,12 @@ use std::sync::Arc;
 use chrono::Utc;
 
 use crate::error::AppError;
-use crate::iam::user::UserRepository;
+use crate::iam::user::{UserRepository, UserRepositoryExt};
 use crate::kernel::{LabelId, Paginated, PaginationOptions, SongId, UserId};
-use crate::label::{LabelRepository, LabelRole};
+use crate::label::{LabelRepository, LabelRepositoryExt, LabelRole};
 
 use super::error::SongError;
-use super::model::{CreateSongRequest, Song, SongFilter, UpdateSongRequest};
+use super::model::{CreateSongRequest, Song, SongFilter, SongWithDetails, UpdateSongRequest};
 use super::port::SongRepository;
 
 pub struct SongService {
@@ -122,6 +122,35 @@ impl SongService {
 
     pub async fn list_by_label(&self, label_id: &LabelId) -> Result<Vec<Song>, AppError> {
         self.song_repo.list_by_label(label_id).await
+    }
+
+    /// Resolve `artist_name`/`label_name` for a batch of songs with one
+    /// query per aggregate, regardless of how many songs are passed.
+    pub async fn to_details(&self, songs: &[Song]) -> Result<Vec<SongWithDetails>, AppError> {
+        let artist_names = self
+            .user_repo
+            .resolve_names(songs.iter().map(|s| s.artist_id.clone()))
+            .await?;
+        let label_names = self
+            .label_repo
+            .resolve_names(songs.iter().filter_map(|s| s.label_id.clone()))
+            .await?;
+
+        Ok(songs
+            .iter()
+            .map(|s| SongWithDetails {
+                song: s.clone(),
+                artist_name: artist_names.get(&s.artist_id).cloned(),
+                label_name: s
+                    .label_id
+                    .as_ref()
+                    .and_then(|id| label_names.get(id).cloned()),
+            })
+            .collect())
+    }
+
+    pub async fn to_detail(&self, song: &Song) -> Result<SongWithDetails, AppError> {
+        Ok(self.to_details(std::slice::from_ref(song)).await?.remove(0))
     }
 }
 
@@ -237,6 +266,16 @@ mod tests {
                 .find(|u| u.id == *id)
                 .cloned())
         }
+        async fn get_by_ids(&self, ids: &[UserId]) -> Result<Vec<User>, AppError> {
+            Ok(self
+                .users
+                .lock()
+                .await
+                .iter()
+                .filter(|u| ids.contains(&u.id))
+                .cloned()
+                .collect())
+        }
         async fn get_by_email(&self, _: &str) -> Result<Option<User>, AppError> {
             Ok(None)
         }
@@ -284,6 +323,16 @@ mod tests {
                 .iter()
                 .find(|l| l.id == *id)
                 .cloned())
+        }
+        async fn get_by_ids(&self, ids: &[LabelId]) -> Result<Vec<Label>, AppError> {
+            Ok(self
+                .labels
+                .lock()
+                .await
+                .iter()
+                .filter(|l| ids.contains(&l.id))
+                .cloned()
+                .collect())
         }
         async fn get_by_name(&self, _: &str) -> Result<Option<Label>, AppError> {
             Ok(None)
