@@ -161,7 +161,12 @@ pub async fn add_member(
     let member = svc
         .add_member(&LabelId::from_string(path.into_inner()), body.into_inner())
         .await?;
-    Ok(HttpResponse::Created().json(LabelMemberResponse::from(&member)))
+    let detail = svc
+        .to_member_details(std::slice::from_ref(&member))
+        .await?
+        .remove(0);
+    let res = LabelMemberResponse::from(&detail);
+    Ok(HttpResponse::Created().json(res))
 }
 
 /// Remove a member from a label
@@ -217,7 +222,12 @@ pub async fn list_members(
     let members = svc
         .list_members(&LabelId::from_string(path.into_inner()))
         .await?;
-    let res: Vec<LabelMemberResponse> = members.iter().map(LabelMemberResponse::from).collect();
+    let res: Vec<LabelMemberResponse> = svc
+        .to_member_details(&members)
+        .await?
+        .iter()
+        .map(LabelMemberResponse::from)
+        .collect();
     Ok(HttpResponse::Ok().json(res))
 }
 
@@ -268,7 +278,12 @@ pub async fn list_label_songs(
     let songs = svc
         .list_by_label(&LabelId::from_string(path.into_inner()))
         .await?;
-    let res: Vec<SongResponse> = songs.iter().map(SongResponse::from).collect();
+    let res: Vec<SongResponse> = svc
+        .to_details(&songs)
+        .await?
+        .iter()
+        .map(SongResponse::from)
+        .collect();
     Ok(HttpResponse::Ok().json(res))
 }
 

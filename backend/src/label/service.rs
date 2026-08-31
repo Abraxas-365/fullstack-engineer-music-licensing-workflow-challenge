@@ -3,12 +3,13 @@ use std::sync::Arc;
 use chrono::Utc;
 
 use crate::error::AppError;
-use crate::iam::user::UserRepository;
+use crate::iam::user::{UserRepository, UserRepositoryExt};
 use crate::kernel::{LabelId, UserId};
 
 use super::error::LabelError;
 use super::model::{
-    AddMemberRequest, CreateLabelRequest, Label, LabelMember, LabelRole, UpdateLabelRequest,
+    AddMemberRequest, CreateLabelRequest, Label, LabelMember, LabelMemberWithDetails, LabelRole,
+    UpdateLabelRequest,
 };
 use super::port::LabelRepository;
 
@@ -154,6 +155,27 @@ impl LabelService {
     pub async fn get_user_labels(&self, user_id: &UserId) -> Result<Vec<Label>, AppError> {
         self.label_repo.get_user_labels(user_id).await
     }
+
+    pub async fn to_member_details(
+        &self,
+        members: &[LabelMember],
+    ) -> Result<Vec<LabelMemberWithDetails>, AppError> {
+        let names = self
+            .user_repo
+            .resolve_names(members.iter().map(|m| m.user_id.clone()))
+            .await?;
+        Ok(members
+            .iter()
+            .cloned()
+            .map(|m| {
+                let user_name = names.get(&m.user_id).cloned();
+                LabelMemberWithDetails {
+                    member: m,
+                    user_name,
+                }
+            })
+            .collect())
+    }
 }
 
 #[cfg(test)]
@@ -196,6 +218,16 @@ mod tests {
                 .iter()
                 .find(|l| l.id == *id)
                 .cloned())
+        }
+        async fn get_by_ids(&self, ids: &[LabelId]) -> Result<Vec<Label>, AppError> {
+            Ok(self
+                .labels
+                .lock()
+                .await
+                .iter()
+                .filter(|l| ids.contains(&l.id))
+                .cloned()
+                .collect())
         }
         async fn get_by_name(&self, name: &str) -> Result<Option<Label>, AppError> {
             Ok(self
@@ -301,6 +333,16 @@ mod tests {
                 .iter()
                 .find(|u| u.id == *id)
                 .cloned())
+        }
+        async fn get_by_ids(&self, ids: &[UserId]) -> Result<Vec<User>, AppError> {
+            Ok(self
+                .users
+                .lock()
+                .await
+                .iter()
+                .filter(|u| ids.contains(&u.id))
+                .cloned()
+                .collect())
         }
         async fn get_by_email(&self, _: &str) -> Result<Option<User>, AppError> {
             Ok(None)

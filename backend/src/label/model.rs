@@ -143,6 +143,7 @@ impl From<&Label> for LabelResponse {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct LabelMemberResponse {
     pub user_id: UserId,
+    pub user_name: Option<String>,
     pub role: String,
     pub joined_at: DateTime<Utc>,
 }
@@ -151,9 +152,26 @@ impl From<&LabelMember> for LabelMemberResponse {
     fn from(m: &LabelMember) -> Self {
         Self {
             user_id: m.user_id.clone(),
+            user_name: None,
             role: m.role.as_str().to_string(),
             joined_at: m.joined_at,
         }
+    }
+}
+
+/// A [`LabelMember`] enriched with the user's name, resolved by the service
+/// layer via a batch lookup.
+#[derive(Debug, Clone)]
+pub struct LabelMemberWithDetails {
+    pub member: LabelMember,
+    pub user_name: Option<String>,
+}
+
+impl From<&LabelMemberWithDetails> for LabelMemberResponse {
+    fn from(d: &LabelMemberWithDetails) -> Self {
+        let mut res = LabelMemberResponse::from(&d.member);
+        res.user_name = d.user_name.clone();
+        res
     }
 }
 
