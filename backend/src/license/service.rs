@@ -69,12 +69,21 @@ impl LicenseService {
         self.events_tx.subscribe()
     }
 
-    fn emit(&self, license: &LicenseRequest, kind: LicenseEventKind, actor: &UserId) {
+    async fn emit(&self, license: &LicenseRequest, kind: LicenseEventKind, actor: &UserId) {
+        let actor_name = self
+            .user_repo
+            .get_by_id(actor)
+            .await
+            .ok()
+            .flatten()
+            .map(|u| u.name)
+            .unwrap_or_else(|| "Unknown".to_string());
         let event = LicenseEvent {
             license_id: license.id.clone(),
             track_id: license.track_id.clone(),
             kind,
             actor: actor.clone(),
+            actor_name,
             timestamp: Utc::now(),
         };
         // Ignore send error — it just means no subscribers are listening.
@@ -318,7 +327,8 @@ impl LicenseService {
         license.status = LicenseStatus::Requested;
         license.updated_at = Utc::now();
         self.license_repo.update(&license).await?;
-        self.emit(&license, LicenseEventKind::Submitted, &actor);
+        self.emit(&license, LicenseEventKind::Submitted, &actor)
+            .await;
         Ok(license)
     }
 
@@ -340,7 +350,8 @@ impl LicenseService {
         let offer = self
             .next_offer(&license.id, side, actor.clone(), &terms)
             .await?;
-        self.emit(&license, LicenseEventKind::CounterOffer, &actor);
+        self.emit(&license, LicenseEventKind::CounterOffer, &actor)
+            .await;
         Ok(offer)
     }
 
@@ -359,7 +370,8 @@ impl LicenseService {
         license.resolved_at = Some(Utc::now());
         license.updated_at = Utc::now();
         self.license_repo.update(&license).await?;
-        self.emit(&license, LicenseEventKind::Accepted, &actor);
+        self.emit(&license, LicenseEventKind::Accepted, &actor)
+            .await;
         Ok(license)
     }
 
@@ -380,7 +392,8 @@ impl LicenseService {
         license.rejection_reason = Some(reason);
         license.updated_at = Utc::now();
         self.license_repo.update(&license).await?;
-        self.emit(&license, LicenseEventKind::Rejected, &actor);
+        self.emit(&license, LicenseEventKind::Rejected, &actor)
+            .await;
         Ok(license)
     }
 
@@ -398,7 +411,8 @@ impl LicenseService {
         license.resolved_at = Some(Utc::now());
         license.updated_at = Utc::now();
         self.license_repo.update(&license).await?;
-        self.emit(&license, LicenseEventKind::Cancelled, &actor);
+        self.emit(&license, LicenseEventKind::Cancelled, &actor)
+            .await;
         Ok(license)
     }
 

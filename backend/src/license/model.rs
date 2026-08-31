@@ -16,6 +16,7 @@ pub struct LicenseEvent {
     pub track_id: TrackId,
     pub kind: LicenseEventKind,
     pub actor: UserId,
+    pub actor_name: String,
     pub timestamp: DateTime<Utc>,
 }
 

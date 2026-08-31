@@ -153,6 +153,7 @@ export interface LicenseEvent {
   track_id: string
   kind: 'submitted' | 'counter_offer' | 'accepted' | 'rejected' | 'cancelled'
   actor: string
+  actor_name: string
   timestamp: string
 }
 

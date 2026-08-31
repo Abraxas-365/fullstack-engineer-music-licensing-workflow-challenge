@@ -519,6 +519,7 @@ const licensesApi: LicensesApi = {
       track_id: license.track_id,
       kind: 'submitted',
       actor: USERS.supervisor.id,
+      actor_name: USER_NAMES[USERS.supervisor.id] ?? 'Unknown',
       timestamp: nowIso(),
     })
     return delay(license)
@@ -555,6 +556,7 @@ const licensesApi: LicensesApi = {
       track_id: license.track_id,
       kind: 'counter_offer',
       actor: proposedBy,
+      actor_name: USER_NAMES[proposedBy] ?? 'Unknown',
       timestamp: nowIso(),
     })
     return delay(offer)
@@ -572,6 +574,7 @@ const licensesApi: LicensesApi = {
       track_id: license.track_id,
       kind: 'accepted',
       actor: license.resolved_by,
+      actor_name: USER_NAMES[license.resolved_by] ?? 'Unknown',
       timestamp: nowIso(),
     })
     return delay(license)
@@ -590,6 +593,7 @@ const licensesApi: LicensesApi = {
       track_id: license.track_id,
       kind: 'rejected',
       actor: license.resolved_by,
+      actor_name: USER_NAMES[license.resolved_by] ?? 'Unknown',
       timestamp: nowIso(),
     })
     return delay(license)
@@ -606,6 +610,7 @@ const licensesApi: LicensesApi = {
       track_id: license.track_id,
       kind: 'cancelled',
       actor: USERS.supervisor.id,
+      actor_name: USER_NAMES[USERS.supervisor.id] ?? 'Unknown',
       timestamp: nowIso(),
     })
     return delay(license)

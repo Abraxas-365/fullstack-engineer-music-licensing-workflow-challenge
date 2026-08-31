@@ -89,7 +89,9 @@ export function NotificationBell() {
                     )}
                   >
                     <p>
-                      <span className="font-medium">{userName(notification.actor)}</span>{' '}
+                      <span className="font-medium">
+                        {userName(notification.actor, notification.actor_name)}
+                      </span>{' '}
                       {EVENT_COPY[notification.kind]}
                     </p>
                     <p className="mt-0.5 text-[11px] text-muted-foreground">
