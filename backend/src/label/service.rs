@@ -45,7 +45,7 @@ impl LabelService {
         self.label_repo
             .get_by_id(id)
             .await?
-            .ok_or_else(|| LabelError::not_found())
+            .ok_or_else(LabelError::not_found)
     }
 
     pub async fn list_labels(&self) -> Result<Vec<Label>, AppError> {
@@ -62,12 +62,11 @@ impl LabelService {
         let mut label = self.get_label(id).await?;
 
         // Check name uniqueness if changing
-        if let Some(ref name) = req.name {
-            if name != &label.name {
-                if self.label_repo.get_by_name(name).await?.is_some() {
-                    return Err(LabelError::already_exists());
-                }
-            }
+        if let Some(ref name) = req.name
+            && name != &label.name
+            && self.label_repo.get_by_name(name).await?.is_some()
+        {
+            return Err(LabelError::already_exists());
         }
 
         if let Some(name) = req.name {
@@ -142,7 +141,7 @@ impl LabelService {
         self.label_repo
             .get_member(label_id, user_id)
             .await?
-            .ok_or_else(|| LabelError::member_not_found())?;
+            .ok_or_else(LabelError::member_not_found)?;
 
         self.label_repo.remove_member(label_id, user_id).await
     }

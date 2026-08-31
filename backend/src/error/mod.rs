@@ -1,6 +1,6 @@
-mod error;
+mod app_error;
 mod types;
 
-pub use error::AppError;
-pub use error::ErrorResponse;
+pub use app_error::AppError;
+pub use app_error::ErrorResponse;
 pub use types::ErrorType;

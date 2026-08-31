@@ -76,7 +76,7 @@ impl SceneService {
         self.scene_repo
             .get_by_id(id)
             .await?
-            .ok_or_else(|| SceneError::not_found())
+            .ok_or_else(SceneError::not_found)
     }
 
     pub async fn list_by_movie(

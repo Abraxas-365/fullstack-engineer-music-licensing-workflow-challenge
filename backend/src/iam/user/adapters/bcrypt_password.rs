@@ -5,6 +5,12 @@ use crate::iam::user::PasswordService;
 
 pub struct BcryptPasswordService;
 
+impl Default for BcryptPasswordService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BcryptPasswordService {
     pub fn new() -> Self {
         Self

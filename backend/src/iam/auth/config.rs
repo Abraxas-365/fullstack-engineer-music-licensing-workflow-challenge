@@ -67,15 +67,15 @@ impl OAuthConfig {
 impl OAuthConfigs {
     pub fn get_enabled_providers(&self) -> Vec<&str> {
         let mut enabled = Vec::new();
-        if let Some(g) = &self.google {
-            if g.is_enabled() {
-                enabled.push("google");
-            }
+        if let Some(g) = &self.google
+            && g.is_enabled()
+        {
+            enabled.push("google");
         }
-        if let Some(m) = &self.microsoft {
-            if m.is_enabled() {
-                enabled.push("microsoft");
-            }
+        if let Some(m) = &self.microsoft
+            && m.is_enabled()
+        {
+            enabled.push("microsoft");
         }
         enabled
     }

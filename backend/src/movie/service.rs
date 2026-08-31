@@ -102,7 +102,7 @@ impl MovieService {
         self.movie_repo
             .get_by_id(id)
             .await?
-            .ok_or_else(|| MovieError::not_found())
+            .ok_or_else(MovieError::not_found)
     }
 
     pub async fn find_movies(
@@ -167,7 +167,7 @@ impl MovieService {
         self.movie_repo
             .get_by_id(movie_id)
             .await?
-            .ok_or_else(|| MovieError::not_found())?;
+            .ok_or_else(MovieError::not_found)?;
 
         self.assert_can_manage_members(movie_id, actor).await?;
 
@@ -212,7 +212,7 @@ impl MovieService {
         self.movie_repo
             .get_member(movie_id, user_id)
             .await?
-            .ok_or_else(|| MovieError::member_not_found())?;
+            .ok_or_else(MovieError::member_not_found)?;
 
         self.movie_repo.remove_member(movie_id, user_id).await
     }
@@ -221,7 +221,7 @@ impl MovieService {
         self.movie_repo
             .get_by_id(movie_id)
             .await?
-            .ok_or_else(|| MovieError::not_found())?;
+            .ok_or_else(MovieError::not_found)?;
 
         self.movie_repo.list_members(movie_id).await
     }

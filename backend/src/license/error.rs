@@ -23,7 +23,7 @@ impl LicenseError {
     pub fn invalid_transition(from: &str, to: &str) -> AppError {
         AppError::new(
             "license.invalid_transition",
-            &format!("Cannot transition from {from} to {to}"),
+            format!("Cannot transition from {from} to {to}"),
             ErrorType::Business,
         )
     }
@@ -31,7 +31,7 @@ impl LicenseError {
     pub fn not_authorized(actor: &UserId) -> AppError {
         AppError::new(
             "license.not_authorized",
-            &format!(
+            format!(
                 "User {} is not authorized to perform this action",
                 actor.as_str()
             ),
@@ -42,7 +42,7 @@ impl LicenseError {
     pub fn own_offer(actor: &UserId) -> AppError {
         AppError::new(
             "license.own_offer",
-            &format!(
+            format!(
                 "User {} cannot act on an offer made by their own side",
                 actor.as_str()
             ),

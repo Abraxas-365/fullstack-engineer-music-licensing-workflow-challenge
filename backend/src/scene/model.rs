@@ -97,24 +97,22 @@ pub struct UpdateSceneRequest {
 
 impl UpdateSceneRequest {
     pub fn validate(&self) -> Result<(), AppError> {
-        if let Some(ref title) = self.title {
-            if title.trim().is_empty() {
-                return Err(
-                    AppError::validation("Title cannot be empty").with_detail("field", "title")
-                );
-            }
+        if let Some(ref title) = self.title
+            && title.trim().is_empty()
+        {
+            return Err(AppError::validation("Title cannot be empty").with_detail("field", "title"));
         }
-        if let Some(num) = self.scene_number {
-            if num < 1 {
-                return Err(AppError::validation("Scene number must be positive")
-                    .with_detail("field", "scene_number"));
-            }
+        if let Some(num) = self.scene_number
+            && num < 1
+        {
+            return Err(AppError::validation("Scene number must be positive")
+                .with_detail("field", "scene_number"));
         }
-        if let Some(start) = self.start_time {
-            if start < 0 {
-                return Err(AppError::validation("Start time cannot be negative")
-                    .with_detail("field", "start_time"));
-            }
+        if let Some(start) = self.start_time
+            && start < 0
+        {
+            return Err(AppError::validation("Start time cannot be negative")
+                .with_detail("field", "start_time"));
         }
         Ok(())
     }

@@ -110,8 +110,8 @@ async fn test_api_login_success() {
 
     let body: serde_json::Value = actix_test::read_body_json(resp).await;
     assert_eq!(body["token_type"], "Bearer");
-    assert!(body["access_token"].as_str().unwrap().len() > 0);
-    assert!(body["refresh_token"].as_str().unwrap().len() > 0);
+    assert!(!body["access_token"].as_str().unwrap().is_empty());
+    assert!(!body["refresh_token"].as_str().unwrap().is_empty());
     assert!(body["expires_in"].as_i64().unwrap() > 0);
 }
 
@@ -182,7 +182,7 @@ async fn test_api_refresh_success() {
     assert_eq!(resp.status(), 200);
 
     let body: serde_json::Value = actix_test::read_body_json(resp).await;
-    assert!(body["access_token"].as_str().unwrap().len() > 0);
+    assert!(!body["access_token"].as_str().unwrap().is_empty());
     assert_ne!(body["refresh_token"].as_str().unwrap(), refresh_token);
 }
 

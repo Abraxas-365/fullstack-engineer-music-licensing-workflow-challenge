@@ -38,7 +38,7 @@ impl UserService {
             .repo
             .get_by_id(id)
             .await?
-            .ok_or_else(|| UserError::not_found())?;
+            .ok_or_else(UserError::not_found)?;
         Ok(user.into())
     }
 
@@ -47,7 +47,7 @@ impl UserService {
             .repo
             .get_by_email(email)
             .await?
-            .ok_or_else(|| UserError::not_found())?;
+            .ok_or_else(UserError::not_found)?;
         Ok(user.into())
     }
 
@@ -77,7 +77,7 @@ impl UserService {
             .repo
             .get_by_id(id)
             .await?
-            .ok_or_else(|| UserError::not_found())?;
+            .ok_or_else(UserError::not_found)?;
 
         if let Some(name) = req.name {
             user.update_profile(Some(name), None);
@@ -100,7 +100,7 @@ impl UserService {
             .repo
             .get_by_id(id)
             .await?
-            .ok_or_else(|| UserError::not_found())?;
+            .ok_or_else(UserError::not_found)?;
         user.activate()?;
         self.repo.update(&user).await?;
         Ok(user.into())
@@ -111,7 +111,7 @@ impl UserService {
             .repo
             .get_by_id(id)
             .await?
-            .ok_or_else(|| UserError::not_found())?;
+            .ok_or_else(UserError::not_found)?;
         user.suspend(reason)?;
         self.repo.update(&user).await?;
         Ok(user.into())
@@ -121,7 +121,7 @@ impl UserService {
         self.repo
             .get_by_id(id)
             .await?
-            .ok_or_else(|| UserError::not_found())?;
+            .ok_or_else(UserError::not_found)?;
         self.repo.delete(id).await
     }
 }
