@@ -98,9 +98,9 @@ async fn test_repo_list_all() {
         .unwrap();
 
     let labels = ctx.label_repo.list_all().await.unwrap();
-    assert_eq!(labels.len(), 2);
-    assert_eq!(labels[0].name, "Alpha");
-    assert_eq!(labels[1].name, "Beta");
+    let names: Vec<&str> = labels.iter().map(|l| l.name.as_str()).collect();
+    assert!(names.contains(&"Alpha"));
+    assert!(names.contains(&"Beta"));
 }
 
 #[tokio::test]

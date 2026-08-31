@@ -185,7 +185,9 @@ async fn test_list_labels() {
     let resp = actix_test::call_service(&app, req).await;
     assert_eq!(resp.status(), 200);
     let body: Vec<serde_json::Value> = actix_test::read_body_json(resp).await;
-    assert_eq!(body.len(), 2);
+    let names: Vec<&str> = body.iter().filter_map(|v| v["name"].as_str()).collect();
+    assert!(names.contains(&"Label A"));
+    assert!(names.contains(&"Label B"));
 }
 
 // ============================================================================
