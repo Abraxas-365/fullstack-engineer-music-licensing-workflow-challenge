@@ -65,7 +65,8 @@ pub async fn create_movie(
 ) -> Result<HttpResponse, AppError> {
     auth.require_scope(scopes::SCOPE_MOVIES_WRITE)?;
     let movie = svc.create_movie(body.into_inner(), auth.user_id).await?;
-    Ok(HttpResponse::Created().json(MovieResponse::from(movie)))
+    let res = MovieResponse::from(&svc.to_detail(movie).await?);
+    Ok(HttpResponse::Created().json(res))
 }
 
 /// List / search movies
@@ -96,9 +97,10 @@ pub async fn find_movies(
         created_by: q.created_by.map(UserId::from_string),
     };
     let paginated = svc.find_movies(&opts, &filter).await?;
-    let items: Vec<MovieResponse> = paginated
-        .items
-        .into_iter()
+    let items: Vec<MovieResponse> = svc
+        .to_details(&paginated.items)
+        .await?
+        .iter()
         .map(MovieResponse::from)
         .collect();
     Ok(HttpResponse::Ok().json(serde_json::json!({
@@ -129,7 +131,8 @@ pub async fn get_movie(
     let movie = svc
         .get_movie(&MovieId::from_string(path.into_inner()))
         .await?;
-    Ok(HttpResponse::Ok().json(MovieResponse::from(movie)))
+    let res = MovieResponse::from(&svc.to_detail(movie).await?);
+    Ok(HttpResponse::Ok().json(res))
 }
 
 /// Update a movie
@@ -161,7 +164,8 @@ pub async fn update_movie(
             &auth.user_id,
         )
         .await?;
-    Ok(HttpResponse::Ok().json(MovieResponse::from(movie)))
+    let res = MovieResponse::from(&svc.to_detail(movie).await?);
+    Ok(HttpResponse::Ok().json(res))
 }
 
 /// Delete a movie
@@ -205,7 +209,12 @@ pub async fn my_movies(
 ) -> Result<HttpResponse, AppError> {
     auth.require_scope(scopes::SCOPE_MOVIES_READ)?;
     let movies = svc.get_user_movies(&auth.user_id).await?;
-    let res: Vec<MovieResponse> = movies.into_iter().map(MovieResponse::from).collect();
+    let res: Vec<MovieResponse> = svc
+        .to_details(&movies)
+        .await?
+        .iter()
+        .map(MovieResponse::from)
+        .collect();
     Ok(HttpResponse::Ok().json(res))
 }
 
@@ -238,7 +247,12 @@ pub async fn add_member(
             &auth.user_id,
         )
         .await?;
-    Ok(HttpResponse::Created().json(MovieMemberResponse::from(&member)))
+    let detail = svc
+        .to_member_details(std::slice::from_ref(&member))
+        .await?
+        .remove(0);
+    let res = MovieMemberResponse::from(&detail);
+    Ok(HttpResponse::Created().json(res))
 }
 
 /// Remove a member from a movie
@@ -295,7 +309,12 @@ pub async fn list_members(
     let members = svc
         .list_members(&MovieId::from_string(path.into_inner()))
         .await?;
-    let res: Vec<MovieMemberResponse> = members.iter().map(MovieMemberResponse::from).collect();
+    let res: Vec<MovieMemberResponse> = svc
+        .to_member_details(&members)
+        .await?
+        .iter()
+        .map(MovieMemberResponse::from)
+        .collect();
     Ok(HttpResponse::Ok().json(res))
 }
 

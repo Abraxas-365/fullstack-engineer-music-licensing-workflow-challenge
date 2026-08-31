@@ -146,6 +146,7 @@ pub struct MovieResponse {
     pub release_year: Option<i32>,
     pub director: Option<String>,
     pub created_by: UserId,
+    pub created_by_name: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -159,9 +160,26 @@ impl From<Movie> for MovieResponse {
             release_year: m.release_year,
             director: m.director,
             created_by: m.created_by,
+            created_by_name: None,
             created_at: m.created_at,
             updated_at: m.updated_at,
         }
+    }
+}
+
+/// A [`Movie`] enriched with the creator's name, resolved by the service
+/// layer via a batch lookup.
+#[derive(Debug, Clone)]
+pub struct MovieWithDetails {
+    pub movie: Movie,
+    pub created_by_name: Option<String>,
+}
+
+impl From<&MovieWithDetails> for MovieResponse {
+    fn from(d: &MovieWithDetails) -> Self {
+        let mut res = MovieResponse::from(d.movie.clone());
+        res.created_by_name = d.created_by_name.clone();
+        res
     }
 }
 
@@ -174,6 +192,7 @@ pub struct MovieFilter {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct MovieMemberResponse {
     pub user_id: UserId,
+    pub user_name: Option<String>,
     pub role: String,
     pub joined_at: DateTime<Utc>,
 }
@@ -182,9 +201,26 @@ impl From<&MovieMember> for MovieMemberResponse {
     fn from(m: &MovieMember) -> Self {
         Self {
             user_id: m.user_id.clone(),
+            user_name: None,
             role: m.role.as_str().to_string(),
             joined_at: m.joined_at,
         }
+    }
+}
+
+/// A [`MovieMember`] enriched with the user's name, resolved by the service
+/// layer via a batch lookup.
+#[derive(Debug, Clone)]
+pub struct MovieMemberWithDetails {
+    pub member: MovieMember,
+    pub user_name: Option<String>,
+}
+
+impl From<&MovieMemberWithDetails> for MovieMemberResponse {
+    fn from(d: &MovieMemberWithDetails) -> Self {
+        let mut res = MovieMemberResponse::from(&d.member);
+        res.user_name = d.user_name.clone();
+        res
     }
 }
 

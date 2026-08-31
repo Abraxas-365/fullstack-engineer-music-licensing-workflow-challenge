@@ -3,13 +3,13 @@ use std::sync::Arc;
 use chrono::Utc;
 
 use crate::error::AppError;
-use crate::iam::user::UserRepository;
+use crate::iam::user::{UserRepository, UserRepositoryExt};
 use crate::kernel::{MovieId, Paginated, PaginationOptions, UserId};
 
 use super::error::MovieError;
 use super::model::{
-    AddMovieMemberRequest, CreateMovieRequest, Movie, MovieFilter, MovieMember, MovieRole,
-    UpdateMovieRequest,
+    AddMovieMemberRequest, CreateMovieRequest, Movie, MovieFilter, MovieMember,
+    MovieMemberWithDetails, MovieRole, MovieWithDetails, UpdateMovieRequest,
 };
 use super::port::MovieRepository;
 
@@ -229,6 +229,56 @@ impl MovieService {
     pub async fn get_user_movies(&self, user_id: &UserId) -> Result<Vec<Movie>, AppError> {
         self.movie_repo.get_user_movies(user_id).await
     }
+
+    // ========================================================================
+    // Response enrichment
+    // ========================================================================
+
+    pub async fn to_details(&self, movies: &[Movie]) -> Result<Vec<MovieWithDetails>, AppError> {
+        let names = self
+            .user_repo
+            .resolve_names(movies.iter().map(|m| m.created_by.clone()))
+            .await?;
+        Ok(movies
+            .iter()
+            .cloned()
+            .map(|m| {
+                let created_by_name = names.get(&m.created_by).cloned();
+                MovieWithDetails {
+                    movie: m,
+                    created_by_name,
+                }
+            })
+            .collect())
+    }
+
+    pub async fn to_detail(&self, movie: Movie) -> Result<MovieWithDetails, AppError> {
+        Ok(self
+            .to_details(std::slice::from_ref(&movie))
+            .await?
+            .remove(0))
+    }
+
+    pub async fn to_member_details(
+        &self,
+        members: &[MovieMember],
+    ) -> Result<Vec<MovieMemberWithDetails>, AppError> {
+        let names = self
+            .user_repo
+            .resolve_names(members.iter().map(|m| m.user_id.clone()))
+            .await?;
+        Ok(members
+            .iter()
+            .cloned()
+            .map(|m| {
+                let user_name = names.get(&m.user_id).cloned();
+                MovieMemberWithDetails {
+                    member: m,
+                    user_name,
+                }
+            })
+            .collect())
+    }
 }
 
 #[cfg(test)]
@@ -394,6 +444,16 @@ mod tests {
                 .iter()
                 .find(|u| u.id == *id)
                 .cloned())
+        }
+        async fn get_by_ids(&self, ids: &[UserId]) -> Result<Vec<User>, AppError> {
+            Ok(self
+                .users
+                .lock()
+                .await
+                .iter()
+                .filter(|u| ids.contains(&u.id))
+                .cloned()
+                .collect())
         }
         async fn get_by_email(&self, _: &str) -> Result<Option<User>, AppError> {
             Ok(None)
