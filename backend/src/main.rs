@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use actix_cors::Cors;
-use actix_web::{App, HttpServer, middleware, web};
+use actix_web::{App, HttpResponse, HttpServer, middleware, web};
 use sqlx::postgres::PgPoolOptions;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -114,6 +114,10 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)
             .wrap(middleware::Logger::default())
             .wrap(middleware::Compress::default())
+            .route(
+                "/health",
+                web::get().to(|| async { HttpResponse::Ok().body("ok") }),
+            )
             .service(SwaggerUi::new("/docs/{_:.*}").url("/api-docs/openapi.json", openapi.clone()))
             .service(
                 web::scope("/api")
