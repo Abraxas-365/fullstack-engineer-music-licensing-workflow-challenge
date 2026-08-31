@@ -34,6 +34,6 @@ export const api: Api = {
   licenses: createProxy('licenses'),
 }
 
-export { getApiMode, setApiMode, subscribeApiMode, type ApiMode } from './mode'
+export { getApiMode, type ApiMode } from './mode'
 export { ApiError } from './error'
 export type * from './types'
