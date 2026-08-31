@@ -142,30 +142,8 @@ async fn main() -> std::io::Result<()> {
 }
 
 async fn run_migrations(pool: &sqlx::PgPool) {
-    let has_tables: bool = sqlx::query_scalar(
-        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users')",
-    )
-    .fetch_one(pool)
-    .await
-    .unwrap_or(false);
-
-    if !has_tables {
-        log::info!("Running migration 001_genesis");
-        sqlx::raw_sql(include_str!("../migrations/001_genesis.up.sql"))
-            .execute(pool)
-            .await
-            .expect("Failed to run migration 001");
-    }
-
-    log::info!("Running migration 002_seed_platform_roles (idempotent)");
-    sqlx::raw_sql(include_str!("../migrations/002_seed_platform_roles.up.sql"))
-        .execute(pool)
+    sqlx::migrate!("./migrations")
+        .run(pool)
         .await
-        .expect("Failed to run migration 002");
-
-    log::info!("Running migration 003_seed_users (idempotent)");
-    sqlx::raw_sql(include_str!("../migrations/003_seed_users.up.sql"))
-        .execute(pool)
-        .await
-        .expect("Failed to run migration 003");
+        .expect("Failed to run database migrations");
 }

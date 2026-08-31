@@ -26,11 +26,10 @@ impl TestDb {
             .await
             .expect("Failed to connect to postgres");
 
-        let migration = include_str!("../../migrations/001_genesis.up.sql");
-        sqlx::raw_sql(migration)
-            .execute(&pool)
+        sqlx::migrate!("./migrations")
+            .run(&pool)
             .await
-            .expect("Failed to run migration");
+            .expect("Failed to run migrations");
 
         Self {
             pool,
