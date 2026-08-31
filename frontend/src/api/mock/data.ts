@@ -31,6 +31,7 @@ export const USERS = {
   supervisor: { id: uuid('user-supervisor'), name: 'Casey Reyes', email: 'casey@studio.dev' },
   artist: { id: uuid('user-artist'), name: 'Nova Chen', email: 'nova@indie.dev' },
   labelManager: { id: uuid('user-label-mgr'), name: 'Priya Anand', email: 'priya@wavelabel.dev' },
+  labelRep: { id: uuid('user-label-rep'), name: 'Mateo Ruiz', email: 'mateo@wavelabel.dev' },
   admin: { id: uuid('user-admin'), name: 'Sam Okafor', email: 'sam@studio.dev' },
 }
 
@@ -63,6 +64,7 @@ export const labels: Label[] = [
 
 export const labelMembers: (LabelMember & { label_id: string })[] = [
   { label_id: labels[0].id, user_id: USERS.labelManager.id, role: 'OWNER', joined_at: daysAgo(200) },
+  { label_id: labels[0].id, user_id: USERS.labelRep.id, role: 'REP', joined_at: daysAgo(165) },
   { label_id: labels[0].id, user_id: USERS.artist.id, role: 'ARTIST', joined_at: daysAgo(120) },
 ]
 
@@ -216,6 +218,19 @@ export const tracks: Track[] = [
     created_at: daysAgo(40),
     updated_at: daysAgo(40),
   },
+  {
+    id: uuid('track-opening-drift'),
+    scene_id: scenes[0].id,
+    song_id: songs[2].id,
+    usage_type: 'TRAILER',
+    start_time_seconds: 30,
+    end_time_seconds: 75,
+    duration_seconds: 45,
+    created_by: USERS.supervisor.id,
+    notes: 'Trailer cut for the international campaign',
+    created_at: daysAgo(8),
+    updated_at: daysAgo(3),
+  },
 ]
 
 // ─── Licenses ───
@@ -255,6 +270,18 @@ export const licenseRequests: LicenseRequest[] = [
     rejection_reason: null,
     created_at: daysAgo(1),
     updated_at: daysAgo(1),
+  },
+  {
+    id: uuid('license-independent'),
+    track_id: tracks[3].id,
+    status: 'REQUESTED',
+    requested_by: USERS.supervisor.id,
+    requested_at: daysAgo(8),
+    resolved_by: null,
+    resolved_at: null,
+    rejection_reason: null,
+    created_at: daysAgo(8),
+    updated_at: daysAgo(3),
   },
 ]
 
@@ -338,6 +365,22 @@ export const licenseOffers: LicenseOffer[] = [
     exclusive: false,
     notes: 'Draft — not yet submitted',
     created_at: daysAgo(1),
+  },
+  {
+    id: uuid('offer-independent-1'),
+    license_request_id: licenseRequests[3].id,
+    offer_number: 1,
+    side: 'MOVIE_TEAM',
+    proposed_by: USERS.supervisor.id,
+    license_fee: 2200,
+    currency: 'USD',
+    territory: 'Worldwide',
+    media_rights: 'Trailer, digital advertising',
+    license_start: null,
+    license_end: null,
+    exclusive: false,
+    notes: 'International trailer campaign for Cyber City',
+    created_at: daysAgo(8),
   },
 ]
 

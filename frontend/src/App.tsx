@@ -10,6 +10,13 @@ import { StudioSceneDetailPage } from '@/pages/studio/scene-detail'
 import { StudioLicensesPage } from '@/pages/studio/licenses-list'
 import { StudioLicenseDetailPage } from '@/pages/studio/license-detail'
 import DesignSystemPage from '@/pages/design-system'
+import { RightsLayout } from '@/pages/rights/layout'
+import { RightsDashboardPage } from '@/pages/rights/dashboard'
+import { RightsCatalogPage } from '@/pages/rights/catalog'
+import { RightsSongDetailPage } from '@/pages/rights/song-detail'
+import { RightsInboxPage } from '@/pages/rights/inbox'
+import { RightsLicenseDetailPage } from '@/pages/rights/license-detail'
+import { RightsMembersPage } from '@/pages/rights/members'
 
 export default function App() {
   return (
@@ -25,6 +32,14 @@ export default function App() {
               <Route path="movies/:movieId/scenes/:sceneId" element={<StudioSceneDetailPage />} />
               <Route path="licenses" element={<StudioLicensesPage />} />
               <Route path="licenses/:licenseId" element={<StudioLicenseDetailPage />} />
+            </Route>
+            <Route path="/rights" element={<RightsLayout />}>
+              <Route index element={<RightsDashboardPage />} />
+              <Route path="catalog" element={<RightsCatalogPage />} />
+              <Route path="catalog/:songId" element={<RightsSongDetailPage />} />
+              <Route path="inbox" element={<RightsInboxPage />} />
+              <Route path="licenses/:licenseId" element={<RightsLicenseDetailPage />} />
+              <Route path="members" element={<RightsMembersPage />} />
             </Route>
             <Route path="/design-system" element={<DesignSystemPage />} />
             <Route path="*" element={<Navigate to="/studio" replace />} />

@@ -41,6 +41,7 @@ import {
   songs,
   tracks,
 } from './data'
+import { getMockActorId } from './actor'
 
 const MOCK_LATENCY_MS = 250
 
@@ -518,7 +519,9 @@ const licensesApi: LicensesApi = {
     if (license.status !== 'REQUESTED') business('License is not negotiable')
     const last = latestOffer(id)
     const side = last.side === 'MOVIE_TEAM' ? 'RIGHTS_HOLDER' : 'MOVIE_TEAM'
-    const proposedBy = side === 'MOVIE_TEAM' ? USERS.supervisor.id : USERS.labelManager.id
+    const proposedBy = side === 'MOVIE_TEAM'
+      ? USERS.supervisor.id
+      : getMockActorId() ?? USERS.labelManager.id
     const offer: LicenseOffer = {
       id: genId('offer'),
       license_request_id: id,
@@ -550,14 +553,14 @@ const licensesApi: LicensesApi = {
     const license = licenseRequests.find(l => l.id === id) ?? notFound('License request')
     if (license.status !== 'REQUESTED') business('License request cannot be accepted in its current state')
     license.status = 'APPROVED'
-    license.resolved_by = USERS.labelManager.id
+    license.resolved_by = getMockActorId() ?? USERS.labelManager.id
     license.resolved_at = nowIso()
     license.updated_at = nowIso()
     emitLicenseEvent({
       license_id: license.id,
       track_id: license.track_id,
       kind: 'accepted',
-      actor: USERS.labelManager.id,
+      actor: license.resolved_by,
       timestamp: nowIso(),
     })
     return delay(license)
@@ -566,7 +569,7 @@ const licensesApi: LicensesApi = {
     const license = licenseRequests.find(l => l.id === id) ?? notFound('License request')
     if (license.status !== 'REQUESTED') business('License request cannot be rejected in its current state')
     license.status = 'REJECTED'
-    license.resolved_by = USERS.labelManager.id
+    license.resolved_by = getMockActorId() ?? USERS.labelManager.id
     license.resolved_at = nowIso()
     license.rejection_reason = reason
     license.updated_at = nowIso()
@@ -574,7 +577,7 @@ const licensesApi: LicensesApi = {
       license_id: license.id,
       track_id: license.track_id,
       kind: 'rejected',
-      actor: USERS.labelManager.id,
+      actor: license.resolved_by,
       timestamp: nowIso(),
     })
     return delay(license)
