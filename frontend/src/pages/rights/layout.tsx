@@ -27,7 +27,6 @@ function RightsLayoutInner() {
       activeHref={activeHref}
       userName={persona.user.name}
       userRole={persona.platformRole}
-      activePersona={persona.id}
       workspaceHref="/rights"
       workspaceName={persona.labelName ?? persona.user.name}
       workspaceDescription={persona.kind === 'label'

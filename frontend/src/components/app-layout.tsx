@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, Check, ChevronsUpDown, LogOut, Moon, Sun } from 'lucide-react'
+import { LogOut, Moon, Sun, ChevronsUpDown } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
 import {
@@ -33,11 +33,6 @@ import {
 import { UserAvatar } from '@/components/user-avatar'
 import { NotificationBell } from '@/components/notification-bell'
 import { useTheme } from '@/components/theme-provider'
-import {
-  RIGHTS_PERSONAS,
-  setRightsPersona,
-  type RightsPersonaId,
-} from '@/lib/rights-persona'
 import type { PlatformRole } from '@/types'
 
 interface NavItem {
@@ -56,24 +51,13 @@ interface NavGroup {
 function UserMenu({
   userName = 'User',
   userRole,
-  activePersona,
 }: {
   userName?: string
   userRole?: PlatformRole
-  activePersona?: RightsPersonaId | 'studio'
 }) {
   const { theme, toggleTheme } = useTheme()
   const { logout } = useAuth()
   const navigate = useNavigate()
-
-  function selectWorkspace(persona: RightsPersonaId | 'studio') {
-    if (persona === 'studio') {
-      navigate('/studio')
-      return
-    }
-    setRightsPersona(persona)
-    navigate('/rights')
-  }
 
   return (
     <DropdownMenu>
@@ -92,23 +76,6 @@ function UserMenu({
       <DropdownMenuContent align="start" side="top" className="w-56">
         <DropdownMenuGroup>
           <DropdownMenuLabel>My account</DropdownMenuLabel>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>Switch workspace</DropdownMenuLabel>
-          <DropdownMenuItem onClick={() => selectWorkspace('studio')} className="justify-between">
-            <span className="flex items-center gap-1.5"><BriefcaseBusiness /> Studio team</span>
-            {activePersona === 'studio' && <Check className="size-3.5" />}
-          </DropdownMenuItem>
-          {(Object.values(RIGHTS_PERSONAS) as Array<(typeof RIGHTS_PERSONAS)[RightsPersonaId]>).map(persona => (
-            <DropdownMenuItem key={persona.id} onClick={() => selectWorkspace(persona.id)} className="justify-between">
-              <span className="min-w-0">
-                <span className="block truncate">{persona.kind === 'independent' ? 'Independent artist' : persona.labelRole === 'OWNER' ? 'Label owner' : persona.labelRole === 'REP' ? 'Label rep' : 'Label artist'}</span>
-                <span className="block truncate text-[10px] text-muted-foreground">{persona.user.name} · {persona.title}</span>
-              </span>
-              {activePersona === persona.id && <Check className="size-3.5 shrink-0" />}
-            </DropdownMenuItem>
-          ))}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem closeOnClick={false} onClick={toggleTheme} className="justify-between">
@@ -133,7 +100,6 @@ interface AppLayoutProps {
   activeHref: string
   userName?: string
   userRole?: PlatformRole
-  activePersona?: RightsPersonaId | 'studio'
   workspaceHref?: string
   workspaceName?: string
   workspaceDescription?: string
@@ -180,7 +146,6 @@ export function AppLayout({
   activeHref,
   userName,
   userRole,
-  activePersona,
   workspaceHref = '/studio',
   workspaceName = 'Music Licensing',
   workspaceDescription = 'Studio workspace',
@@ -217,7 +182,7 @@ export function AppLayout({
         <SidebarFooter>
           <SidebarMenu>
             <SidebarMenuItem>
-              <UserMenu userName={userName} userRole={userRole} activePersona={activePersona} />
+              <UserMenu userName={userName} userRole={userRole} />
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>
