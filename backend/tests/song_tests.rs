@@ -329,6 +329,11 @@ async fn test_repo_find_pagination() {
             .unwrap();
     }
 
+    // Filter by our artist so seeded songs (migration 004) don't count.
+    let filter = SongFilter {
+        artist_id: Some(artist.id.clone()),
+        ..Default::default()
+    };
     let page1 = ctx
         .song_repo
         .find(
@@ -336,7 +341,7 @@ async fn test_repo_find_pagination() {
                 page: 1,
                 page_size: 2,
             },
-            &SongFilter::default(),
+            &filter,
         )
         .await
         .unwrap();
@@ -351,7 +356,7 @@ async fn test_repo_find_pagination() {
                 page: 3,
                 page_size: 2,
             },
-            &SongFilter::default(),
+            &filter,
         )
         .await
         .unwrap();
@@ -596,6 +601,7 @@ async fn test_service_find_songs() {
         ctx.song_svc.create_song(req).await.unwrap();
     }
 
+    // Filter by our artist so seeded songs (migration 004) don't count.
     let result = ctx
         .song_svc
         .find_songs(
@@ -603,7 +609,10 @@ async fn test_service_find_songs() {
                 page: 1,
                 page_size: 10,
             },
-            &SongFilter::default(),
+            &SongFilter {
+                artist_id: Some(artist.id.clone()),
+                ..Default::default()
+            },
         )
         .await
         .unwrap();
