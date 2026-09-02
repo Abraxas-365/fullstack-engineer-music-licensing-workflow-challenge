@@ -12,6 +12,7 @@ const DEMO_ACCOUNTS = [
   { email: 'casey@studio.dev', role: 'Producer', desc: 'Movie supervisor (Studio)' },
   { email: 'jordan@studio.dev', role: 'Producer', desc: 'Movie team member (Studio)' },
   { email: 'nova@indie.dev', role: 'Artist', desc: 'Song creator (Rights holder)' },
+  { email: 'iris@solo.dev', role: 'Artist', desc: 'Independent artist (no label)' },
   { email: 'priya@wavelabel.dev', role: 'Label Manager', desc: 'Label owner (Wave Records)' },
   { email: 'mateo@wavelabel.dev', role: 'Label Manager', desc: 'Label rep (Wave Records)' },
   { email: 'sam@studio.dev', role: 'Admin', desc: 'Platform administrator' },
