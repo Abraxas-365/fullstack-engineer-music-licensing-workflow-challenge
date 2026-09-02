@@ -249,8 +249,9 @@ async fn test_list_songs() {
         actix_test::call_service(&app, req).await;
     }
 
+    // Filter by our artist so seeded songs (migrations 003/004) don't count.
     let req = actix_test::TestRequest::get()
-        .uri("/songs")
+        .uri(&format!("/songs?artist_id={}", artist.id.as_str()))
         .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     let resp = actix_test::call_service(&app, req).await;
