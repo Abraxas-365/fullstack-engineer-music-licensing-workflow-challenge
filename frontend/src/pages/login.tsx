@@ -25,17 +25,35 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/studio'
+  const stateFrom = (location.state as { from?: { pathname: string } })?.from?.pathname
+
+  function defaultRoute(scopes: string[]): string {
+    if (scopes.includes('*')) return '/studio'
+    if (scopes.includes('movies:*')) return '/studio'
+    if (scopes.includes('songs:*')) return '/rights'
+    return '/studio'
+  }
+
+  /** Only honor the pre-login location if the user's scopes allow that section. */
+  function resolveDest(scopes: string[]): string {
+    if (stateFrom) {
+      const canStudio = scopes.includes('*') || scopes.includes('movies:*')
+      const canRights = scopes.includes('*') || scopes.includes('songs:*')
+      if (stateFrom.startsWith('/studio') && canStudio) return stateFrom
+      if (stateFrom.startsWith('/rights') && canRights) return stateFrom
+    }
+    return defaultRoute(scopes)
+  }
 
   // If already logged in, redirect
-  if (user && getApiMode() === 'real') return <Navigate to={from} replace />
+  if (user && getApiMode() === 'real') return <Navigate to={resolveDest(user.scopes)} replace />
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     setBusy(true)
     try {
-      await login(email, password)
-      navigate(from, { replace: true })
+      const me = await login(email, password)
+      navigate(resolveDest(me.scopes), { replace: true })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Login failed')
     } finally {

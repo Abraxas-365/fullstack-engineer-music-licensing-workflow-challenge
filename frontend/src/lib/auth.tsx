@@ -12,7 +12,7 @@ interface AuthState {
 }
 
 interface AuthContextValue extends AuthState {
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<MeResponse>
   logout: () => Promise<void>
 }
 
@@ -104,13 +104,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [scheduleRefresh])
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string): Promise<MeResponse> => {
     const tokens = await api.auth.login({ email, password })
     storeRefresh(tokens.refresh_token)
     const user = await api.auth.me()
     cacheUserName(user.user_id, user.name)
     setState({ user, loading: false })
     scheduleRefresh(tokens.expires_in)
+    return user
   }, [scheduleRefresh])
 
   const logout = useCallback(async () => {
